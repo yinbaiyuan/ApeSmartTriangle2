@@ -3,46 +3,93 @@
 
 HalfDuplexSerial hdSerial(10);
 
-int selectPin[3] = {5,6,7};
-int ledPin[3] = {2,3,4};
+int selectPin[3] = {5, 6, 7};
+int ledPin[3] = {2, 3, 4};
 
 enum TriangleStateType
 {
-    TST_NONE = 0,
-    TST_POSITIONED = 1,
-    SMT_PARENT,
+  TST_NONE = 0,
+  TST_WATING_LOCATE = 1,
+  TST_LOCATED,
 };
 
 TriangleStateType m_triangleStateType;
-int m_fatherNodePin;
-int m_leftLeafNodePin;
-int m_rightLeafNodePin;
-int m_ledPin;
-
+int m_fatherNodePin = -1;
+int m_leftLeafNodePin = -1;
+int m_rightLeafNodePin = -1;
+int m_ledPin = -1;
+int m_nodeId = -1;
 void topologyCheck()
 {
-  for(int i = 0;i<3;i++)
+
+}
+
+void topologyInit()
+{
+  for (int i = 0; i < 3; i++)
   {
-    pinMode(selectPin[i],INPUT);
+    pinMode(selectPin[i], INPUT);
+  }
+  m_triangleStateType = TST_NONE;
+}
+
+void transmitAction()
+{
+  hdSerial.setMode(SMT_TRANSMIT);
+  TPT.tpTransmit();
+  hdSerial.setMode(SMT_RECEIVE);
+  TPT.tpBeginReceive();
+}
+
+void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
+{
+  Serial.println("tpCallback pId:" + String(pId) + " Timeout:" + String(isTimeout ? "True" : "False"));
+  switch (pId)
+  {
+    case 1:
+      {
+        topologyInit();
+      }
+      break;
+    case 51:
+      {
+        m_fatherNodePin = -1;
+        for (int i = 0; i < 3; i++)
+        {
+          if (digitalRead(selectPin[i]) == HIGH)
+          {
+            m_fatherNodePin = selectPin[i];
+            break;
+          }
+        }
+        if (m_fatherNodePin != -1)
+        {
+          //确认上级节点位置
+          m_triangleStateType = TST_WATING_LOCATE;
+          TPT.tpBegin(51);
+          transmitAction();
+        }
+      }
+      break;
+    case 2:
+      {
+        if (m_triangleStateType == TST_WATING_LOCATE)
+        {
+          m_nodeId = payload[0];
+          Serial.println("nodeId:" + String(m_nodeId));
+          m_triangleStateType = TST_LOCATED;
+        }
+      }
+      break;
   }
 }
 
-void tpCallback(byte pId, byte *payload, unsigned int length)
+void transmitCallback(byte *ptBuffer, unsigned int ptLength)
 {
-  Serial.println("callback" + String(pId));
-  switch(pId)
+  for (int i = 0; i < ptLength; i++)
   {
-    case 1:
-    {
-      Serial.println("r:"+String(payload[0])+" g:"+String(payload[1])+" b:"+String(payload[2]));
-      String myText = "";
-      for (int i = 3; i < length; i++)
-      {
-        char c = payload[i];
-        myText += c;
-      }
-      Serial.println(myText);
-    }
+    int c = ptBuffer[i];
+    hdSerial.write(c);
   }
 }
 
@@ -50,51 +97,24 @@ void setup()
 {
   hdSerial.begin(9600);
   hdSerial.setMode(SMT_RECEIVE);
-  pinMode(11,INPUT_PULLUP);
-  TPT.callbackRegister(tpCallback);
+  pinMode(11, INPUT_PULLUP);
+  TPT.callbackRegister(tpCallback, transmitCallback);
   TPT.tpBeginReceive();
-  for(int i = 0;i<3;i++)
-  {
-    pinMode(selectPin[i],INPUT);
-  }
-  m_triangleStateType = TST_NONE;
-  
+  topologyInit();
+
+
   Serial.begin(9600);
   pinMode(2, INPUT);
 }
 
 void loop()
 {
-  topologyCheck();
-//  if (digitalRead(2) == LOW)
-//  {
-//    if (hdSerial.serialModeType() == SMT_TRANSMIT)
-//    {
-//      Serial.println("RX");
-//      hdSerial.setMode(SMT_RECEIVE);
-//    } else if (hdSerial.serialModeType() == SMT_RECEIVE)
-//    {
-//      Serial.println("TX");
-//      hdSerial.setMode(SMT_TRANSMIT);
-//    }
-//    delay(500);
-//  }
-  if (hdSerial.serialModeType() == SMT_TRANSMIT)
+  TPT.protocolLoop();
+  if (hdSerial.serialModeType() == SMT_RECEIVE)
   {
-    while (Serial.available())
-    {
-      int c = Serial.read();
-      hdSerial.write(c);
-    }
-  } else if (hdSerial.serialModeType() == SMT_RECEIVE)
-  {
-//    Serial.println("rec");
     while (hdSerial.available())
     {
-      int c = hdSerial.read();
-      TPT.tpPushData(c).tpParse();
-//      Serial.println(c);
-//      Serial.write(c);
+      TPT.tpPushData(hdSerial.read()).tpParse();
     }
   }
 }
