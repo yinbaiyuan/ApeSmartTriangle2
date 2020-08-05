@@ -1,0 +1,93 @@
+#include "HalfDuplexSerial.h"
+#include <Arduino.h>
+
+HalfDuplexSerial::HalfDuplexSerial(int8_t pin)
+{
+  m_transmitSeirial = new SoftwareSerial(-1, pin);
+  m_receiveSerial = new SoftwareSerial(pin, -1);
+  m_pin = pin;
+  m_serialModeType = SMT_NONE;
+}
+
+HalfDuplexSerial::~HalfDuplexSerial()
+{
+  delete m_transmitSeirial;
+  delete m_receiveSerial;
+}
+
+void HalfDuplexSerial::begin(long speed)
+{
+  m_transmitSeirial->begin(speed);
+  m_receiveSerial->begin(speed);
+}
+
+void HalfDuplexSerial::end()
+{
+  m_receiveSerial->end();
+  m_transmitSeirial->end();
+  m_serialModeType = SMT_NONE;
+}
+
+void HalfDuplexSerial::setMode(SerialModeType smt)
+{
+  switch (smt)
+  {
+    case SMT_TRANSMIT:
+      {
+        pinMode(m_pin, OUTPUT);
+        m_receiveSerial->end();
+        m_transmitSeirial->listen();
+        m_serialModeType = SMT_TRANSMIT;
+      }
+      break;
+    case SMT_RECEIVE:
+      {
+        pinMode(m_pin, INPUT_PULLUP);
+        m_transmitSeirial->end();
+        m_receiveSerial->listen();
+        m_serialModeType = SMT_RECEIVE;
+        
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+size_t HalfDuplexSerial::write(uint8_t byte)
+{
+  if (m_serialModeType == SMT_TRANSMIT)
+  {
+    m_transmitSeirial->write(byte);
+  } else
+  {
+
+  }
+}
+
+int HalfDuplexSerial::read()
+{
+  if (m_serialModeType == SMT_RECEIVE)
+  {
+    return m_receiveSerial->read();
+  } else
+  {
+    return -1;
+  }
+}
+
+int HalfDuplexSerial::available()
+{
+  if (m_serialModeType == SMT_RECEIVE)
+  {
+    return m_receiveSerial->available();
+  } else
+  {
+    return 0;
+  }
+}
+
+SerialModeType HalfDuplexSerial::serialModeType()
+{
+  return m_serialModeType;
+}

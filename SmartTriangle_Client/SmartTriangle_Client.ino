@@ -19,6 +19,51 @@ int m_leftLeafNodePin = -1;
 int m_rightLeafNodePin = -1;
 int m_ledPin = -1;
 int m_nodeId = -1;
+
+
+void startSelect(bool isLeft)
+{
+  if (isLeft)
+  {
+    pinMode(m_leftLeafNodePin, OUTPUT);
+    digitalWrite(m_leftLeafNodePin, HIGH);
+  } else
+  {
+    pinMode(m_rightLeafNodePin, OUTPUT);
+    digitalWrite(m_rightLeafNodePin, HIGH);
+  }
+}
+
+void stopSelect(bool isLeft)
+{
+  if (isLeft)
+  {
+    pinMode(m_leftLeafNodePin, INPUT);
+  } else
+  {
+    pinMode(m_rightLeafNodePin, INPUT);
+  }
+}
+
+bool seekFatherPin()
+{
+  m_fatherNodePin = -1;
+  for (int i = 0; i < 3; i++)
+  {
+    if (digitalRead(selectPin[i]) == HIGH)
+    {
+      m_fatherNodePin = selectPin[i];
+      m_leftLeafNodePin = selectPin((i - 1) < 0 ? 2 : (i - 1));
+      m_rightLeafNodePin = selectPin((i + 1) > 2 ? 0 : (i + 1));
+      break;
+    }
+  }
+  if(m_fatherNodePin != -1) return true;
+  else return false;
+}
+
+
+
 void topologyCheck()
 {
 
@@ -51,18 +96,17 @@ void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
         topologyInit();
       }
       break;
+    case 21:
+      {
+        if (m_nodeId == payload[0])
+        {
+          startSelect(true);
+        }
+      }
+      break;
     case 51:
       {
-        m_fatherNodePin = -1;
-        for (int i = 0; i < 3; i++)
-        {
-          if (digitalRead(selectPin[i]) == HIGH)
-          {
-            m_fatherNodePin = selectPin[i];
-            break;
-          }
-        }
-        if (m_fatherNodePin != -1)
+        if (seekFatherPin())
         {
           //确认上级节点位置
           m_triangleStateType = TST_WATING_LOCATE;
