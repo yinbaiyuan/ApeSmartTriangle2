@@ -11,7 +11,6 @@ enum SerialModeType
     SMT_RECEIVE,
 };
 
-
 class HalfDuplexSerial
 {
 private:
@@ -20,15 +19,19 @@ private:
     SerialModeType m_serialModeType;
     int m_pin;
 public:
+
     HalfDuplexSerial(int8_t pin);
     ~HalfDuplexSerial();
+
     void begin(long speed);
     void end();
-    void setMode(SerialModeType smt);
     size_t write(uint8_t byte);
     int read();
     int available();
-    SerialModeType serialModeType();
+
+    void setMode(SerialModeType smt);
+    SerialModeType serialModeType(){return m_serialModeType;}
+    
 };
 
 #endif

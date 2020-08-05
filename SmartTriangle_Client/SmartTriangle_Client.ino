@@ -53,8 +53,8 @@ bool seekFatherPin()
     if (digitalRead(selectPin[i]) == HIGH)
     {
       m_fatherNodePin = selectPin[i];
-      m_leftLeafNodePin = selectPin((i - 1) < 0 ? 2 : (i - 1));
-      m_rightLeafNodePin = selectPin((i + 1) > 2 ? 0 : (i + 1));
+//      m_leftLeafNodePin = selectPin((i - 1) < 0 ? 2 : (i - 1));
+//      m_rightLeafNodePin = selectPin((i + 1) > 2 ? 0 : (i + 1));
       break;
     }
   }
@@ -158,6 +158,7 @@ void loop()
   {
     while (hdSerial.available())
     {
+//      Serial.write(hdSerial.read());
       TPT.tpPushData(hdSerial.read()).tpParse();
     }
   }

@@ -28,40 +28,14 @@ void HalfDuplexSerial::end()
   m_serialModeType = SMT_NONE;
 }
 
-void HalfDuplexSerial::setMode(SerialModeType smt)
-{
-  switch (smt)
-  {
-    case SMT_TRANSMIT:
-      {
-        pinMode(m_pin, OUTPUT);
-        m_receiveSerial->end();
-        m_transmitSeirial->listen();
-        m_serialModeType = SMT_TRANSMIT;
-      }
-      break;
-    case SMT_RECEIVE:
-      {
-        pinMode(m_pin, INPUT_PULLUP);
-        m_transmitSeirial->end();
-        m_receiveSerial->listen();
-        m_serialModeType = SMT_RECEIVE;
-        
-      }
-      break;
-    default:
-      break;
-  }
-}
-
 size_t HalfDuplexSerial::write(uint8_t byte)
 {
   if (m_serialModeType == SMT_TRANSMIT)
   {
-    m_transmitSeirial->write(byte);
+    return m_transmitSeirial->write(byte);
   } else
   {
-
+    return -1;
   }
 }
 
@@ -87,7 +61,25 @@ int HalfDuplexSerial::available()
   }
 }
 
-SerialModeType HalfDuplexSerial::serialModeType()
+void HalfDuplexSerial::setMode(SerialModeType smt)
 {
-  return m_serialModeType;
+  switch (smt)
+  {
+    case SMT_TRANSMIT:
+      {
+        pinMode(m_pin, OUTPUT);
+        m_transmitSeirial->listen();
+        m_serialModeType = SMT_TRANSMIT;
+      }
+      break;
+    case SMT_RECEIVE:
+      {
+        pinMode(m_pin, INPUT_PULLUP);
+        m_receiveSerial->listen();
+        m_serialModeType = SMT_RECEIVE;
+      }
+      break;
+    default:
+      break;
+  }
 }

@@ -2,7 +2,7 @@
 #include "TriangleProtocol.h"
 #include "SmartTopology.h"
 
-HalfDuplexSerial hdSerial(6);
+HalfDuplexSerial hdSerial(D6);
 
 void receiveAction()
 {
@@ -20,6 +20,21 @@ void startSelect()
 void stopSelect()
 {
   pinMode(5, INPUT);
+}
+
+void seekRootNode()
+{
+  //寻找根节点
+  startSelect();
+  TPT.tpBegin(51);
+  receiveAction();
+}
+
+void seekLeafNode(STNodeDef *node)
+{
+  TPT.tpBegin(21).tpByte(node->nodeId).tpTransmit();
+  TPT.tpBegin(51);
+  receiveAction();
 }
 
 void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
@@ -58,38 +73,24 @@ void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
 
 void transmitCallback(byte *ptBuffer, unsigned int ptLength)
 {
-  for (int i = 0; i < ptLength; i++)
+  for (unsigned int i = 0; i < ptLength; i++)
   {
     int c = ptBuffer[i];
     hdSerial.write(c);
   }
 }
 
-void seekRootNode()
-{
-  //寻找根节点
-  startSelect();
-  TPT.tpBegin(51);
-  receiveAction();
-}
 
-void seekLeafNode(STNodeDef *node)
-{
-  TPT.tpBegin(21).tpByte(node->nodeId).tpTransmit();
-  TPT.tpBegin(51);
-  receiveAction();
-}
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
   pinMode(2, INPUT);
   
   hdSerial.begin(9600);
   hdSerial.setMode(SMT_TRANSMIT);
-  pinMode(7, INPUT_PULLUP);
+  pinMode(D7, INPUT_PULLUP);
   TPT.callbackRegister(tpCallback, transmitCallback);
-  TPT.tpBeginReceive();
   
   delay(200);
   TPT.tpBegin(1).tpTransmit();
@@ -109,4 +110,14 @@ void loop()
       TPT.tpPushData(hdSerial.read()).tpParse();
     }
   }
+  // if (hdSerial.serialModeType() == SMT_TRANSMIT)
+  // {
+
+  //   while (Serial.available())
+  //   {
+  //     Serial.println("test");
+  //     //TPT.tpPushData(hdSerial.read()).tpParse();
+  //     hdSerial.write(Serial.read());
+  //   }
+  // }
 }

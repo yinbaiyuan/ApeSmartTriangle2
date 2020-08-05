@@ -9,7 +9,7 @@ struct PIdTimeoutDef
   uint32_t timeout;
 };
 
-PIdTimeoutDef* storage_array[10];
+PIdTimeoutDef* pIdTimeoutVec_array[10];
 Vector<PIdTimeoutDef *> pIdTimeoutVec;
 
 static uint8_t m_ptBuffer[256];
@@ -18,12 +18,14 @@ static uint8_t m_ptLength;
 TriangleProtocol::TriangleProtocol()
 {
   this->callback = NULL;
-  pIdTimeoutVec.setStorage(storage_array);
+  this->trans_callback = NULL;
+  pIdTimeoutVec.setStorage(pIdTimeoutVec_array);
 }
 
 TriangleProtocol::~TriangleProtocol()
 {
   this->callback = NULL;
+  this->trans_callback = NULL;
 }
 
 void TriangleProtocol::callbackRegister(TP_PARSE_CALLBACK, TP_TRANSMIT_CALLBACK)
@@ -31,6 +33,7 @@ void TriangleProtocol::callbackRegister(TP_PARSE_CALLBACK, TP_TRANSMIT_CALLBACK)
   this->callback = callback;
   this->trans_callback = trans_callback;
 }
+
 
 TriangleProtocol &TriangleProtocol::tpBegin(byte pid)
 {
@@ -40,6 +43,7 @@ TriangleProtocol &TriangleProtocol::tpBegin(byte pid)
   m_ptBuffer[m_ptLength++] = pid;
   return TPT;
 }
+
 
 TriangleProtocol &TriangleProtocol::tpByte(byte b)
 {
@@ -84,6 +88,7 @@ TriangleProtocol &TriangleProtocol::tpBeginReceive()
   m_ptLength = 0;
   m_ptBuffer[0] = 0;
   m_ptBuffer[1] = 0;
+  return TPT;
 }
 
 TriangleProtocol &TriangleProtocol::tpPushData(uint8_t d)
@@ -91,7 +96,7 @@ TriangleProtocol &TriangleProtocol::tpPushData(uint8_t d)
   //  Serial.println("d:"+String(d)+" m_ptLength:"+String(m_ptLength));
   if (m_ptLength == 0 && d != 0)
   {
-    return;
+    return TPT;
   }
   m_ptBuffer[m_ptLength++] = d;
   return TPT;
@@ -110,7 +115,6 @@ void TriangleProtocol::tpParse()
     this->callback(pId, m_ptBuffer + 3, pLength - 3, false);
     //解析完成
     TPT.tpBeginReceive();
-
   }
 }
 
@@ -128,7 +132,7 @@ void TriangleProtocol::protocolTimeoutRemove(uint8_t pId)
   for (int i = pIdTimeoutVec.size() - 1; i >= 0; i--)
   {
     PIdTimeoutDef* pIdTimeoutDef = pIdTimeoutVec[i];
-    if (pIdTimeoutDef->pId = pId)
+    if (pIdTimeoutDef->pId == pId)
     {
       pIdTimeoutVec.remove(i);
       delete pIdTimeoutDef;
@@ -138,7 +142,6 @@ void TriangleProtocol::protocolTimeoutRemove(uint8_t pId)
 }
 void TriangleProtocol::protocolLoop()
 {
-
   for (int i = pIdTimeoutVec.size() - 1; i >= 0; i--)
   {
     PIdTimeoutDef* pIdTimeoutDef = pIdTimeoutVec[i];

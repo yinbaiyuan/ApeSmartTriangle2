@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <Vector.h>
 
-STNodeDef* stNodeStack_storage[10];
+STNodeDef* stNodeStack_storage[64];
 Vector<STNodeDef *> stNodeStack;
 
 static uint8_t idCreator = 0;
