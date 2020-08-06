@@ -24,7 +24,7 @@ class TriangleProtocol
     TriangleProtocol &tpBegin(byte pid);
     TriangleProtocol &tpByte(byte b);
     TriangleProtocol &tpColor(byte r,byte g,byte b);
-    TriangleProtocol &tpStr(const String &str,bool pushSize = false);
+    TriangleProtocol &tpStr(const String &str);
     void tpTransmit(bool checkTimeout = false);
 
     TriangleProtocol &tpBeginReceive();

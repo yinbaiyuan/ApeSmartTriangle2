@@ -69,6 +69,11 @@ void HalfDuplexSerial::setMode(SerialModeType smt)
       {
         pinMode(m_pin, OUTPUT);
         m_transmitSeirial->listen();
+        m_transmitSeirial->flush();
+        m_transmitSeirial->enableRx(false);
+        m_transmitSeirial->enableTx(true);
+        m_receiveSerial->enableRx(false);
+        m_receiveSerial->enableTx(false);
         m_serialModeType = SMT_TRANSMIT;
       }
       break;
@@ -76,6 +81,11 @@ void HalfDuplexSerial::setMode(SerialModeType smt)
       {
         pinMode(m_pin, INPUT_PULLUP);
         m_receiveSerial->listen();
+        m_receiveSerial->flush();
+        m_transmitSeirial->enableRx(false);
+        m_transmitSeirial->enableTx(false);
+        m_receiveSerial->enableRx(true);
+        m_receiveSerial->enableTx(false);
         m_serialModeType = SMT_RECEIVE;
       }
       break;

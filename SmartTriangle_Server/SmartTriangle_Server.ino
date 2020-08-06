@@ -2,7 +2,7 @@
 #include "TriangleProtocol.h"
 #include "SmartTopology.h"
 
-HalfDuplexSerial hdSerial(6);
+HalfDuplexSerial hdSerial(10);
 
 void receiveAction()
 {
@@ -87,14 +87,14 @@ void setup()
   
   hdSerial.begin(9600);
   hdSerial.setMode(SMT_TRANSMIT);
-  pinMode(7, INPUT_PULLUP);
-  TPT.callbackRegister(tpCallback, transmitCallback);
-  TPT.tpBeginReceive();
-  
-  delay(200);
-  TPT.tpBegin(1).tpTransmit();
-
-  seekRootNode();
+  pinMode(11, INPUT_PULLUP);
+//  TPT.callbackRegister(tpCallback, transmitCallback);
+//  TPT.tpBeginReceive();
+//  
+//  delay(200);
+//  TPT.tpBegin(1).tpTransmit();
+//
+//  seekRootNode();
 }
 
 
@@ -102,11 +102,16 @@ void setup()
 void loop()
 {
   TPT.protocolLoop();
-  if (hdSerial.serialModeType() == SMT_RECEIVE)
+//  if (hdSerial.serialModeType() == SMT_RECEIVE)
+//  {
+//    while (hdSerial.available())
+//    {
+//      TPT.tpPushData(hdSerial.read()).tpParse();
+//    }
+//  }
+  while (Serial.available())
   {
-    while (hdSerial.available())
-    {
-      TPT.tpPushData(hdSerial.read()).tpParse();
-    }
+    Serial.println("a");
+    hdSerial.write(Serial.read());
   }
 }

@@ -1,7 +1,9 @@
 #include "HalfDuplexSerial.h"
 #include "TriangleProtocol.h"
 
-HalfDuplexSerial hdSerial(10);
+#define HDSERIAL_PIN 10
+
+HalfDuplexSerial hdSerial(HDSERIAL_PIN);
 
 int selectPin[3] = {5, 6, 7};
 int ledPin[3] = {2, 3, 4};
@@ -53,8 +55,8 @@ bool seekFatherPin()
     if (digitalRead(selectPin[i]) == HIGH)
     {
       m_fatherNodePin = selectPin[i];
-//      m_leftLeafNodePin = selectPin((i - 1) < 0 ? 2 : (i - 1));
-//      m_rightLeafNodePin = selectPin((i + 1) > 2 ? 0 : (i + 1));
+      m_leftLeafNodePin = selectPin[(i - 1) < 0 ? 2 : (i - 1)];
+      m_rightLeafNodePin = selectPin[(i + 1) > 2 ? 0 : (i + 1)];
       break;
     }
   }
@@ -120,7 +122,7 @@ void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
         if (m_triangleStateType == TST_WATING_LOCATE)
         {
           m_nodeId = payload[0];
-          Serial.println("nodeId:" + String(m_nodeId));
+          Serial.println("NODE ID:" + String(m_nodeId));
           m_triangleStateType = TST_LOCATED;
         }
       }
@@ -132,7 +134,7 @@ void transmitCallback(byte *ptBuffer, unsigned int ptLength)
 {
   for (int i = 0; i < ptLength; i++)
   {
-    int c = ptBuffer[i];
+    byte c = ptBuffer[i];
     hdSerial.write(c);
   }
 }
@@ -158,7 +160,6 @@ void loop()
   {
     while (hdSerial.available())
     {
-//      Serial.write(hdSerial.read());
       TPT.tpPushData(hdSerial.read()).tpParse();
     }
   }
