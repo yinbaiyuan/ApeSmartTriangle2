@@ -3,10 +3,17 @@
 #include "SmartTopology.h"
 #include <Vector.h>
 
+enum STLightType
+{
+    STLT_WAITING_CHECK = 0,
+    STLT_CHECKING = 1,
+    STLT_SHOW_EFFECT
+};
+
 STNodeDef *seekNodeQueue_storage[64];
 Vector<STNodeDef *> seekNodeQueue;
 STNodeDef *currentNode;
-
+STLightType stLightType;
 #define HDSERIAL_PIN D6
 #define SLECTED_PIN D5
 
@@ -37,28 +44,51 @@ void stopSelect()
 void seekRootNode()
 {
   //寻找根节点
+  stLightType = STLT_CHECKING;
   startSelect();
   TPT.tpBegin(51).tpTransmit(true);
   waitingReceive();
 }
 
-void seekAction()
+void seekNodeByQueue()
 {
   if (seekNodeQueue.size() <= 0)
+  {
+    stLightType = STLT_SHOW_EFFECT;
     return;
+  }
   STNodeDef *node = seekNodeQueue[0];
-  // currentNode = node;
-
+  if (node->leftChildType == STNT_WAITING_CHECK)
+  {
+    node->leftChildType = STNT_CHECKING;
+    TPT.tpBegin(21).tpByte(node->nodeId).tpTransmit();
+    delay(100);
+    TPT.tpBegin(52).tpTransmit(true);
+    waitingReceive();
+    currentNode = node;
+  }else if(node->rightChildType == STNT_WAITING_CHECK)
+  {
+    node->rightChildType = STNT_CHECKING;
+    TPT.tpBegin(23).tpByte(node->nodeId).tpTransmit();
+    delay(100);
+    TPT.tpBegin(52).tpTransmit(true);
+    waitingReceive();
+    currentNode = node;
+  }
 }
 
 void seekLeafNode()
 {
   seekNodeQueue.push_back(ST.rootNode());
-  seekAction();
+  seekNodeByQueue();
+}
 
-  // TPT.tpBegin(21).tpByte(node->nodeId).tpTransmit();
-  // // TPT.tpBegin(51).tpTransmit(true);
-  // waitingReceive();
+void effectLoop()
+{
+  int count = ST.nodeCount();
+  int index = random(0,count);
+  TPT.tpBegin(101).tpByte(index).tpColor(random(50,150),random(50,150),random(50,150)).tpTransmit();
+  delay(100);
 }
 
 void tpCallback(byte pId, byte *payload, unsigned int length, bool isTimeout)
@@ -92,6 +122,53 @@ void tpCallback(byte pId, byte *payload, unsigned int length, bool isTimeout)
     }
   }
   break;
+  case 52:
+  {
+    if (isTimeout)
+    {
+      //无子节点
+      if (currentNode->leftChildType == STNT_CHECKING)
+      {
+        TPT.tpBegin(22).tpByte(currentNode->nodeId).tpTransmit();
+        currentNode->leftChildType = STNT_HAS_NO_CHILD;
+      }
+      else if (currentNode->rightChildType == STNT_CHECKING)
+      {
+        TPT.tpBegin(24).tpByte(currentNode->nodeId).tpTransmit();
+        currentNode->rightChildType = STNT_HAS_NO_CHILD;
+        seekNodeQueue.remove(0);
+      }
+      seekNodeByQueue();
+    }
+    else
+    {
+      //有子节点
+      STNodeDef *node = ST.creatNode();
+      seekNodeQueue.push_back(node);
+      Serial.println("CHILD NODE ID:" + String(node->nodeId));
+      if (currentNode->leftChildType == STNT_CHECKING)
+      {
+        currentNode->leftChildType = STNT_HAS_CHILD;
+        currentNode->leftChild = node;
+        TPT.tpBegin(22).tpByte(currentNode->nodeId).tpTransmit();
+        TPT.tpBegin(2).tpByte(node->nodeId).tpTransmit();
+      }
+      else if (currentNode->rightChildType == STNT_CHECKING)
+      {
+        currentNode->rightChildType = STNT_HAS_CHILD;
+        currentNode->rightChild = node;
+        TPT.tpBegin(24).tpByte(currentNode->nodeId).tpTransmit();
+        TPT.tpBegin(2).tpByte(node->nodeId).tpTransmit();
+        seekNodeQueue.remove(0);
+      }else
+      {
+        seekNodeQueue.pop_back();
+        delete node;
+      }
+      seekNodeByQueue();
+    }
+  }
+  break;
   }
 }
 
@@ -107,7 +184,7 @@ void transmitCallback(byte *ptBuffer, unsigned int ptLength)
 void setup()
 {
   seekNodeQueue.setStorage(seekNodeQueue_storage);
-
+  stLightType = STLT_WAITING_CHECK;
   Serial.begin(115200);
   pinMode(D2, INPUT);
 
@@ -132,6 +209,11 @@ void loop()
       byte c = hdSerial.read();
       TPT.tpPushData(c).tpParse();
     }
+  }
+  if(stLightType == STLT_SHOW_EFFECT)
+  {
+    Serial.println("show effect");
+    effectLoop();
   }
   // if(digitalRead(D2)==LOW)
   // {

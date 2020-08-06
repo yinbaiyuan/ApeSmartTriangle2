@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <Vector.h>
 
-STNodeDef* stNodeStack_storage[64];
+STNodeDef *stNodeStack_storage[64];
 Vector<STNodeDef *> stNodeStack;
 
 static uint8_t idCreator = 0;
@@ -33,16 +33,20 @@ STNodeDef *SmartTopology::creatNode()
   STNodeDef *node = new STNodeDef();
   memset(node, 0, sizeof(STNodeDef));
   node->nodeId = this->creadId();
+  stNodeStack.push_back(node);
   return node;
 }
 
 uint8_t SmartTopology::creatRootNode()
 {
   m_rootNode = this->creatNode();
-  stNodeStack.push_back(m_rootNode);
   return m_rootNode->nodeId;
 }
 
+uint8_t SmartTopology::nodeCount()
+{
+  return stNodeStack.size();
+}
 
 STNodeDef *SmartTopology::rootNode()
 {
@@ -99,7 +103,7 @@ void SmartTopology::flush()
   this->deleteTree(m_rootNode);
 }
 
-void SmartTopology::deleteTree(STNodeDef* node)
+void SmartTopology::deleteTree(STNodeDef *node)
 {
   if (node)
   {

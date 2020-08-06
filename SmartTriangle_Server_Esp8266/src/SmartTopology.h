@@ -34,6 +34,7 @@ class SmartTopology
     STNodeDef *rootNode();
     // void nextNode(STNodeDef* node);
     uint8_t creatRootNode();
+    uint8_t nodeCount();
     void flush();
 };
 
