@@ -3,13 +3,11 @@
 #include <FastLED.h>
 #include <Vector.h>
 
-
-
 #define HDSERIAL_PIN 10
 #define NUM_LEDS 15
 #define LED_PIN 4
 CRGB leds[NUM_LEDS];
-
+CRGB targetColor;
 enum TriangleStateType
 {
   TST_NONE = 0,
@@ -17,20 +15,48 @@ enum TriangleStateType
   TST_LOCATED = 2,
 };
 
+typedef void (*EffectCallback)(unsigned int, unsigned int, void *effect);
 struct STEffectCallbackDef
 {
-  uint8_t   effectId;
   uint16_t  callbackTimes;
-  uint32_t  autoChangeTime;
-  uint32_t  currentChangeTime;
   uint16_t  frameCount;
   uint32_t  frameRefreshTime;   //ms
   uint16_t  currentFrameCount;
   uint32_t  currentRefreshTime;
+  uint8_t   custom8[6];
+  uint16_t  custom16[3];
+  uint32_t  custom32[1];
+  EffectCallback callback;
 };
-
+uint32_t preCheckTime = 0;
 STEffectCallbackDef *stEffectCallbackDef_array[32];
 Vector<STEffectCallbackDef *> stEffectCallbackVec;
+
+STEffectCallbackDef *effectCreate(uint16_t n, uint16_t c, uint32_t t, EffectCallback callback)
+{
+  STEffectCallbackDef *effect = new STEffectCallbackDef();
+  effect->callbackTimes = n;
+  effect->frameCount = c;
+  effect->currentFrameCount = 0;
+  effect->frameRefreshTime = t;
+  effect->currentRefreshTime = t;
+  effect->callback = callback;
+  stEffectCallbackVec.push_back(effect);
+  return effect;
+}
+
+void effectDelete(STEffectCallbackDef *effect)
+{
+  for (int i = stEffectCallbackVec.size() - 1; i >= 0; i--)
+  {
+    STEffectCallbackDef *e = stEffectCallbackVec[i];
+    if (effect == e)
+    {
+      stEffectCallbackVec.remove(i);
+      delete effect;
+    }
+  }
+}
 
 HalfDuplexSerial hdSerial(HDSERIAL_PIN);
 
@@ -142,6 +168,18 @@ void effectInit()
   LEDS.setBrightness(200);
 }
 
+void effect102Callback(unsigned int n, unsigned int c, void *e)
+{
+  STEffectCallbackDef *effect = (STEffectCallbackDef *)e;
+  uint8_t r = (long(effect->custom8[0]) - effect->custom8[3]) * (c + 1) / effect->frameCount +  effect->custom8[3];
+  uint8_t g = (long(effect->custom8[1]) - effect->custom8[4]) * (c + 1) / effect->frameCount +  effect->custom8[4];
+  uint8_t b = (long(effect->custom8[2]) - effect->custom8[5]) * (c + 1) / effect->frameCount +  effect->custom8[5];
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[ledNumsConverter(i)] = CRGB(r, g, b);
+  }
+  FastLED.show();
+}
+
 void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
 {
   Serial.println("tpCallback pId:" + String(pId) + " Timeout:" + String(isTimeout ? "True" : "False"));
@@ -219,12 +257,27 @@ void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
       break;
     case 101:
       {
-        if (m_nodeId == payload[0])
+        if (m_nodeId == payload[0] || payload[0] == 255)
         {
           for (int i = 0; i < NUM_LEDS; i++) {
             leds[ledNumsConverter(i)] = CHSV(payload[1], payload[2], payload[3]);
           }
           FastLED.show();
+        }
+      }
+      break;
+    case 102:
+      {
+        if (m_nodeId == payload[0] || payload[0] == 255)
+        {
+          uint16_t t = uint16_t(payload[1] << 8) + uint16_t(payload[2]);
+          STEffectCallbackDef *effect = effectCreate(2, t / 15, 15 , effect102Callback);
+          effect->custom8[0] = payload[3];
+          effect->custom8[1] = payload[4];
+          effect->custom8[2] = payload[5];
+          effect->custom8[3] = leds[0].r;
+          effect->custom8[4] = leds[1].g;
+          effect->custom8[5] = leds[2].b;
         }
       }
       break;
@@ -242,6 +295,9 @@ void transmitCallback(byte *ptBuffer, unsigned int ptLength)
 
 void setup()
 {
+  Serial.begin(9600);
+  Serial.println("STARTING.......");
+  
   LEDS.addLeds<WS2813, LED_PIN, RGB>(leds, NUM_LEDS);
   stEffectCallbackVec.setStorage(stEffectCallbackDef_array);
   hdSerial.begin(9600);
@@ -251,9 +307,7 @@ void setup()
   TPT.tpBeginReceive();
   topologyInit();
 
-  Serial.begin(9600);
-  pinMode(2, INPUT);
-  Serial.println("STARTING.......");
+  preCheckTime = millis();
 }
 
 void loop()
@@ -266,4 +320,38 @@ void loop()
       TPT.tpPushData(hdSerial.read()).tpParse();
     }
   }
+  int effectSize = stEffectCallbackVec.size();
+  int diff = millis() - preCheckTime ;
+
+  for (int i = effectSize - 1; i >= 0; i--)//必须逆向遍历
+  {
+    STEffectCallbackDef *effect = stEffectCallbackVec[i];
+    if (diff > 0)
+    {
+      if (effect->currentRefreshTime > diff)
+      {
+        effect->currentRefreshTime -= diff;
+      } else
+      {
+        effect->callback(effect->callbackTimes, effect->currentFrameCount, effect);
+        effect->currentFrameCount++;
+        effect->currentRefreshTime = effect->frameRefreshTime;
+        if (effect->currentFrameCount >= effect->frameCount)
+        {
+          effect->currentFrameCount = 0;
+          if (effect->callbackTimes == 1)
+          {
+            effectDelete(effect);//必须逆向遍历
+          } else
+          {
+            if (effect->callbackTimes > 1)
+            {
+              effect->callbackTimes--;
+            }
+          }
+        }
+      }
+    }
+  }
+  preCheckTime = millis();
 }
