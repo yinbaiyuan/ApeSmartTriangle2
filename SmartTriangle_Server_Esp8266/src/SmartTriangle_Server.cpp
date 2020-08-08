@@ -112,24 +112,36 @@ void seekRootNode()
 }
 
 
-void randomEffect(unsigned int n, unsigned int c, void *effect)
-{
-  Serial.println("randomEffect n:" + String(n) + " c:" + String(c));
-  uint16_t t = 1000;
-  TPT.tpBegin(102).tpByte(c).tpByte((t >> 8) & 0xFF).tpByte(t & 0xFF).tpColor(random(50, 150), random(50, 150), random(50, 150)).tpTransmit();
-}
-
 void uniformColorEffect(unsigned int n, unsigned int c, void *effect)
 {
-  Serial.println("uniformColorEffect n:" + String(n) + " c:" + String(c));
-  TPT.tpBegin(101).tpByte(255).tpColor(random(50, 150), random(50, 150), random(50, 150)).tpTransmit();
+  // Serial.println("uniformColorEffect n:" + String(n) + " c:" + String(c));
+  TPT.tpBegin(101).tpByte(255).tpUint16(5000).tpColor(0, 255, 0).tpTransmit();
+}
+
+void singleRandomEffect(unsigned int n, unsigned int c, void *effect)
+{
+  // Serial.println("randomEffect n:" + String(n) + " c:" + String(c));
+  TPT.tpBegin(102).tpByte(c).tpUint16(5000).tpByte(random(0, 256)).tpTransmit();
+}
+
+void singleLedEffect(unsigned int n, unsigned int c, void *effect)
+{
+  // Serial.println("uniformColorEffect n:" + String(n) + " c:" + String(c));
+  TPT.tpBegin(103).tpByte(255).tpUint16(5000).tpColor(0, 255, 0).tpTransmit();
+}
+
+void randomEffect(unsigned int n, unsigned int c, void *effect)
+{
+  // Serial.println("randomEffect n:" + String(n) + " c:" + String(c));
+  TPT.tpBegin(104).tpByte(255).tpUint16(3000).tpUint16(5000).tpTransmit();
 }
 
 void effectSetup()
 {
   int count = ST.nodeCount();
-  effectCreate(2000*count,count,2000,randomEffect);
-  effectCreate(10000,1,10000,uniformColorEffect);
+  effectCreate(5000*count,count,5000,randomEffect);
+  // effectCreate(10000,2,5000,uniformColorEffect);
+  // effectCreate(10000,2,5000,singleLedEffect);
 }
 
 void effectClear()

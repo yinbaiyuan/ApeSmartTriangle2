@@ -72,7 +72,7 @@ TriangleProtocol &TriangleProtocol::tpStr(const String &str)
 
 void TriangleProtocol::tpTransmit(bool checkTimeout)
 {
-  m_ptBuffer[m_ptLength] = m_ptLength + 1;
+  m_ptBuffer[m_ptLength] = m_ptLength + 1; //TODO:最后一位应该改为校验码
   m_ptBuffer[1] = m_ptLength + 1;
 
   this->trans_callback(m_ptBuffer, m_ptLength + 1);
@@ -109,7 +109,7 @@ void TriangleProtocol::tpParse()
     return;
   if (pLength <= m_ptLength)
   {
-    if (pLength != m_ptBuffer[pLength - 1])
+    if (pLength != m_ptBuffer[pLength - 1])//TODO:用校验码检查数据合法性
     {
       //数据校验失败
     }

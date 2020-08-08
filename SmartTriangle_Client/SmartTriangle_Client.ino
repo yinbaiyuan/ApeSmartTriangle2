@@ -7,7 +7,7 @@
 #define NUM_LEDS 15
 #define LED_PIN 4
 CRGB leds[NUM_LEDS];
-CRGB targetColor;
+
 enum TriangleStateType
 {
   TST_NONE = 0,
@@ -168,14 +168,34 @@ void effectInit()
   LEDS.setBrightness(200);
 }
 
+
+
+void effect101Callback(unsigned int n, unsigned int c, void *e)
+{
+  STEffectCallbackDef *effect = (STEffectCallbackDef *)e;
+  uint8_t h = (long(effect->custom8[1]) - effect->custom8[0]) * (c + 1) / effect->frameCount +  effect->custom8[0];
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[ledNumsConverter(i)] = CHSV(h, 255, 255);
+  }
+  FastLED.show();
+}
+
 void effect102Callback(unsigned int n, unsigned int c, void *e)
 {
   STEffectCallbackDef *effect = (STEffectCallbackDef *)e;
-  uint8_t r = (long(effect->custom8[0]) - effect->custom8[3]) * (c + 1) / effect->frameCount +  effect->custom8[3];
-  uint8_t g = (long(effect->custom8[1]) - effect->custom8[4]) * (c + 1) / effect->frameCount +  effect->custom8[4];
-  uint8_t b = (long(effect->custom8[2]) - effect->custom8[5]) * (c + 1) / effect->frameCount +  effect->custom8[5];
+  uint8_t h = (long(effect->custom8[1]) - effect->custom8[0]) * (c + 1) / effect->frameCount +  effect->custom8[0];
   for (int i = 0; i < NUM_LEDS; i++) {
-    leds[ledNumsConverter(i)] = CRGB(r, g, b);
+    leds[ledNumsConverter(i)] = CHSV(h, 255, 255);
+  }
+  FastLED.show();
+}
+
+void effect103Callback(unsigned int n, unsigned int c, void *e)
+{
+  STEffectCallbackDef *effect = (STEffectCallbackDef *)e;
+  uint8_t h = (long(effect->custom8[1]) - effect->custom8[0]) * (c + 1) / effect->frameCount +  effect->custom8[0];
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[ledNumsConverter(i)] = CHSV((h + i*10) % 256, 255, 255);
   }
   FastLED.show();
 }
@@ -259,10 +279,10 @@ void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
       {
         if (m_nodeId == payload[0] || payload[0] == 255)
         {
-          for (int i = 0; i < NUM_LEDS; i++) {
-            leds[ledNumsConverter(i)] = CHSV(payload[1], payload[2], payload[3]);
-          }
-          FastLED.show();
+          uint16_t t = uint16_t(payload[1] << 8) + uint16_t(payload[2]);
+          STEffectCallbackDef *effect = effectCreate(1, t / 15, 15 , effect101Callback);
+          effect->custom8[0] = payload[4];
+          effect->custom8[1] = payload[3];
         }
       }
       break;
@@ -271,13 +291,34 @@ void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
         if (m_nodeId == payload[0] || payload[0] == 255)
         {
           uint16_t t = uint16_t(payload[1] << 8) + uint16_t(payload[2]);
-          STEffectCallbackDef *effect = effectCreate(2, t / 15, 15 , effect102Callback);
+          STEffectCallbackDef *effect = effectCreate(1, t / 15, 15 , effect102Callback);
           effect->custom8[0] = payload[3];
-          effect->custom8[1] = payload[4];
-          effect->custom8[2] = payload[5];
-          effect->custom8[3] = leds[0].r;
-          effect->custom8[4] = leds[1].g;
-          effect->custom8[5] = leds[2].b;
+          effect->custom8[1] = rgb2hsv_approximate(leds[0]).h;
+        }
+      }
+      break;
+     case 103:
+      {
+        if (m_nodeId == payload[0] || payload[0] == 255)
+        {
+          uint16_t t = uint16_t(payload[1] << 8) + uint16_t(payload[2]);
+          STEffectCallbackDef *effect = effectCreate(1, t / 15, 15 , effect103Callback);
+          effect->custom8[0] = payload[4];
+          effect->custom8[1] = payload[3];
+        }
+      }
+      break;
+      case 104:
+      {
+        if (m_nodeId == payload[0] || payload[0] == 255)
+        {
+          uint16_t t1 = uint16_t(payload[1] << 8) + uint16_t(payload[2]);
+          uint16_t t2 = uint16_t(payload[3] << 8) + uint16_t(payload[4]);
+          randomSeed(analogRead(A0)); 
+          uint16_t t = random(t1,t2);
+          STEffectCallbackDef *effect = effectCreate(1, t / 15, 15 , effect101Callback);
+          effect->custom8[0] = random(0,256);
+          effect->custom8[1] = rgb2hsv_approximate(leds[0]).h;
         }
       }
       break;
@@ -295,10 +336,12 @@ void transmitCallback(byte *ptBuffer, unsigned int ptLength)
 
 void setup()
 {
+  pinMode(A0,INPUT);
   Serial.begin(9600);
   Serial.println("STARTING.......");
   
   LEDS.addLeds<WS2813, LED_PIN, RGB>(leds, NUM_LEDS);
+  LEDS.setBrightness(200);
   stEffectCallbackVec.setStorage(stEffectCallbackDef_array);
   hdSerial.begin(9600);
   hdSerial.setMode(SMT_RECEIVE);

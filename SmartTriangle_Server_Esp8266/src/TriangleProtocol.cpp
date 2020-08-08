@@ -51,6 +51,22 @@ TriangleProtocol &TriangleProtocol::tpByte(byte b)
   return TPT;
 }
 
+TriangleProtocol &TriangleProtocol::tpUint16(uint16_t i)
+{
+  m_ptBuffer[m_ptLength++] = (i >> 8) & 0xFF;
+  m_ptBuffer[m_ptLength++] = (i >> 0) & 0xFF;
+  return TPT;
+}
+
+TriangleProtocol &TriangleProtocol::tpUint32(uint32_t i)
+{
+  m_ptBuffer[m_ptLength++] = (i >> 24) & 0xFF;
+  m_ptBuffer[m_ptLength++] = (i >> 16) & 0xFF;
+  m_ptBuffer[m_ptLength++] = (i >> 8) & 0xFF;
+  m_ptBuffer[m_ptLength++] = (i >> 0) & 0xFF;
+  return TPT;
+}
+
 TriangleProtocol &TriangleProtocol::tpColor(byte r, byte g, byte b)
 {
   m_ptBuffer[m_ptLength++] = r;

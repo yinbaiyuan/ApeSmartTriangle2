@@ -23,6 +23,8 @@ class TriangleProtocol
 
     TriangleProtocol &tpBegin(byte pid);
     TriangleProtocol &tpByte(byte b);
+    TriangleProtocol &tpUint16(uint16_t i);
+    TriangleProtocol &tpUint32(uint32_t i);
     TriangleProtocol &tpColor(byte r,byte g,byte b);
     TriangleProtocol &tpStr(const String &str);
     void tpTransmit(bool checkTimeout = false);
