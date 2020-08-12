@@ -1,6 +1,6 @@
 #include "TriangleProtocol.h"
 #include <Arduino.h>
-#include <Vector.h>
+#include "Vector.h"
 
 struct PIdTimeoutDef
 {
@@ -51,6 +51,22 @@ TriangleProtocol &TriangleProtocol::tpByte(byte b)
   return TPT;
 }
 
+TriangleProtocol &TriangleProtocol::tpUint16(uint16_t i)
+{
+  m_ptBuffer[m_ptLength++] = (i >> 8) & 0xFF;
+  m_ptBuffer[m_ptLength++] = (i >> 0) & 0xFF;
+  return TPT;
+}
+
+TriangleProtocol &TriangleProtocol::tpUint32(uint32_t i)
+{
+  m_ptBuffer[m_ptLength++] = (i >> 24) & 0xFF;
+  m_ptBuffer[m_ptLength++] = (i >> 16) & 0xFF;
+  m_ptBuffer[m_ptLength++] = (i >> 8) & 0xFF;
+  m_ptBuffer[m_ptLength++] = (i >> 0) & 0xFF;
+  return TPT;
+}
+
 TriangleProtocol &TriangleProtocol::tpColor(byte r, byte g, byte b)
 {
   m_ptBuffer[m_ptLength++] = r;
@@ -72,7 +88,7 @@ TriangleProtocol &TriangleProtocol::tpStr(const String &str)
 
 void TriangleProtocol::tpTransmit(bool checkTimeout)
 {
-  m_ptBuffer[m_ptLength] = m_ptLength + 1; //TODO:最后一位应该改为校验码
+  m_ptBuffer[m_ptLength] = m_ptLength + 1;
   m_ptBuffer[1] = m_ptLength + 1;
 
   this->trans_callback(m_ptBuffer, m_ptLength + 1);
@@ -109,7 +125,7 @@ void TriangleProtocol::tpParse()
     return;
   if (pLength <= m_ptLength)
   {
-    if (pLength != m_ptBuffer[pLength - 1])//TODO:用校验码检查数据合法性
+    if (pLength != m_ptBuffer[pLength - 1])
     {
       //数据校验失败
     }

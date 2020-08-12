@@ -1,11 +1,15 @@
 #include "HalfDuplexSerial.h"
 #include "TriangleProtocol.h"
 #include <FastLED.h>
-#include <Vector.h>
-
+#include "ArduiDispatch.h"
+#include "ADHueAction.h"
+#include "MemoryFree.h"
 #define HDSERIAL_PIN 10
 #define NUM_LEDS 15
 #define LED_PIN 4
+
+HalfDuplexSerial hdSerial(HDSERIAL_PIN);
+
 CRGB leds[NUM_LEDS];
 
 enum TriangleStateType
@@ -14,51 +18,6 @@ enum TriangleStateType
   TST_WATING_LOCATE = 1,
   TST_LOCATED = 2,
 };
-
-typedef void (*EffectCallback)(unsigned int, unsigned int, void *effect);
-struct STEffectCallbackDef
-{
-  uint16_t  callbackTimes;
-  uint16_t  frameCount;
-  uint32_t  frameRefreshTime;   //ms
-  uint16_t  currentFrameCount;
-  uint32_t  currentRefreshTime;
-  uint8_t   custom8[6];
-  uint16_t  custom16[3];
-  uint32_t  custom32[1];
-  EffectCallback callback;
-};
-uint32_t preCheckTime = 0;
-STEffectCallbackDef *stEffectCallbackDef_array[32];
-Vector<STEffectCallbackDef *> stEffectCallbackVec;
-
-STEffectCallbackDef *effectCreate(uint16_t n, uint16_t c, uint32_t t, EffectCallback callback)
-{
-  STEffectCallbackDef *effect = new STEffectCallbackDef();
-  effect->callbackTimes = n;
-  effect->frameCount = c;
-  effect->currentFrameCount = 0;
-  effect->frameRefreshTime = t;
-  effect->currentRefreshTime = t;
-  effect->callback = callback;
-  stEffectCallbackVec.push_back(effect);
-  return effect;
-}
-
-void effectDelete(STEffectCallbackDef *effect)
-{
-  for (int i = stEffectCallbackVec.size() - 1; i >= 0; i--)
-  {
-    STEffectCallbackDef *e = stEffectCallbackVec[i];
-    if (effect == e)
-    {
-      stEffectCallbackVec.remove(i);
-      delete effect;
-    }
-  }
-}
-
-HalfDuplexSerial hdSerial(HDSERIAL_PIN);
 
 int selectPin[3] = {6, 7, 8};
 uint16_t ledNumOffset = 0;
@@ -113,7 +72,6 @@ bool seekFatherPin()
   {
     if (digitalRead(selectPin[i]) == HIGH)
     {
-
       m_fatherNodePin = selectPin[i];
       m_leftLeafNodePin = selectPin[(i - 1) < 0 ? 2 : (i - 1)];
       m_rightLeafNodePin = selectPin[(i + 1) > 2 ? 0 : (i + 1)];
@@ -152,6 +110,7 @@ void topologyInit()
   m_leftLeafNodePin = -1;
   m_rightLeafNodePin = -1;
   m_nodeId = -1;
+//  Director.flush();
   Serial.println("TOPOLOGY RESET");
 }
 
@@ -172,37 +131,34 @@ void effectInit()
 
 void effect101Callback(unsigned int n, unsigned int c, void *e)
 {
-  STEffectCallbackDef *effect = (STEffectCallbackDef *)e;
-  uint8_t h = (long(effect->custom8[1]) - effect->custom8[0]) * (c + 1) / effect->frameCount +  effect->custom8[0];
+  //  STEffectCallbackDef *effect = (STEffectCallbackDef *)e;
+  //  uint8_t h = (long(effect->custom8[1]) - effect->custom8[0]) * (c + 1) / effect->frameCount +  effect->custom8[0];
+  //  for (int i = 0; i < NUM_LEDS; i++) {
+  //    leds[ledNumsConverter(i)] = CHSV(h, 255, 255);
+  //  }
+  //  FastLED.show();
+}
+
+void effect102Callback(uint8_t h, void *e)
+{
   for (int i = 0; i < NUM_LEDS; i++) {
     leds[ledNumsConverter(i)] = CHSV(h, 255, 255);
   }
   FastLED.show();
 }
 
-void effect102Callback(unsigned int n, unsigned int c, void *e)
+void effect103Callback(uint8_t h, void *e)
 {
-  STEffectCallbackDef *effect = (STEffectCallbackDef *)e;
-  uint8_t h = (long(effect->custom8[1]) - effect->custom8[0]) * (c + 1) / effect->frameCount +  effect->custom8[0];
-  for (int i = 0; i < NUM_LEDS; i++) {
-    leds[ledNumsConverter(i)] = CHSV(h, 255, 255);
-  }
-  FastLED.show();
-}
-
-void effect103Callback(unsigned int n, unsigned int c, void *e)
-{
-  STEffectCallbackDef *effect = (STEffectCallbackDef *)e;
-  uint8_t h = (long(effect->custom8[1]) - effect->custom8[0]) * (c + 1) / effect->frameCount +  effect->custom8[0];
-  for (int i = 0; i < NUM_LEDS; i++) {
-    leds[ledNumsConverter(i)] = CHSV((h + i*10) % 256, 255, 255);
-  }
-  FastLED.show();
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[ledNumsConverter(i)] = CHSV((h + i*10) % 256, 255, 255);
+    }
+    FastLED.show();
 }
 
 void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
 {
   Serial.println("tpCallback pId:" + String(pId) + " Timeout:" + String(isTimeout ? "True" : "False"));
+            ADLOG_V(freeMemory());
   switch (pId)
   {
     case 1:
@@ -280,9 +236,9 @@ void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
         if (m_nodeId == payload[0] || payload[0] == 255)
         {
           uint16_t t = uint16_t(payload[1] << 8) + uint16_t(payload[2]);
-          STEffectCallbackDef *effect = effectCreate(1, t / 15, 15 , effect101Callback);
-          effect->custom8[0] = payload[4];
-          effect->custom8[1] = payload[3];
+//          ADHueAction *action = ADHueAction::create(effect101Callback, payload[3], payload[4], t);
+//          ADActor *testActor = ADActor::create(t, action);
+//          Director.addActor(testActor);
         }
       }
       break;
@@ -291,34 +247,29 @@ void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
         if (m_nodeId == payload[0] || payload[0] == 255)
         {
           uint16_t t = uint16_t(payload[1] << 8) + uint16_t(payload[2]);
-          STEffectCallbackDef *effect = effectCreate(1, t / 15, 15 , effect102Callback);
-          effect->custom8[0] = payload[3];
-          effect->custom8[1] = rgb2hsv_approximate(leds[0]).h;
+          ADHueAction *action = ADHueAction::create(effect102Callback, rgb2hsv_approximate(leds[0]).h, payload[3], t );
+          ADActor *actor = ADActor::create(t, action, true);
+          Director.addActor(actor);
         }
       }
       break;
-     case 103:
+    case 103:
       {
         if (m_nodeId == payload[0] || payload[0] == 255)
         {
           uint16_t t = uint16_t(payload[1] << 8) + uint16_t(payload[2]);
-          STEffectCallbackDef *effect = effectCreate(1, t / 15, 15 , effect103Callback);
-          effect->custom8[0] = payload[4];
-          effect->custom8[1] = payload[3];
+          ADHueAction *action = ADHueAction::create(effect103Callback, payload[3], payload[4], t);
+          ADActor *testActor = ADActor::create(t, action, true);
+          Director.addActor(testActor);
         }
       }
       break;
-      case 104:
+    case 104:
       {
         if (m_nodeId == payload[0] || payload[0] == 255)
         {
-          uint16_t t1 = uint16_t(payload[1] << 8) + uint16_t(payload[2]);
-          uint16_t t2 = uint16_t(payload[3] << 8) + uint16_t(payload[4]);
-          randomSeed(analogRead(A0)); 
-          uint16_t t = random(t1,t2);
-          STEffectCallbackDef *effect = effectCreate(1, t / 15, 15 , effect101Callback);
-          effect->custom8[0] = random(0,256);
-          effect->custom8[1] = rgb2hsv_approximate(leds[0]).h;
+          uint8_t brightness = payload[1];
+          LEDS.setBrightness(brightness);
         }
       }
       break;
@@ -336,21 +287,31 @@ void transmitCallback(byte *ptBuffer, unsigned int ptLength)
 
 void setup()
 {
-  pinMode(A0,INPUT);
+  pinMode(A0, INPUT);
+
   Serial.begin(9600);
+
   Serial.println("STARTING.......");
-  
+
   LEDS.addLeds<WS2813, LED_PIN, RGB>(leds, NUM_LEDS);
+
   LEDS.setBrightness(200);
-  stEffectCallbackVec.setStorage(stEffectCallbackDef_array);
+
   hdSerial.begin(9600);
+
   hdSerial.setMode(SMT_RECEIVE);
+
   pinMode(11, INPUT_PULLUP);
+
   TPT.callbackRegister(tpCallback, transmitCallback);
+
   TPT.tpBeginReceive();
+
   topologyInit();
 
-  preCheckTime = millis();
+  Director.begin(true);
+
+  Director.startAction(millis());
 }
 
 void loop()
@@ -363,38 +324,5 @@ void loop()
       TPT.tpPushData(hdSerial.read()).tpParse();
     }
   }
-  int effectSize = stEffectCallbackVec.size();
-  int diff = millis() - preCheckTime ;
-
-  for (int i = effectSize - 1; i >= 0; i--)//必须逆向遍历
-  {
-    STEffectCallbackDef *effect = stEffectCallbackVec[i];
-    if (diff > 0)
-    {
-      if (effect->currentRefreshTime > diff)
-      {
-        effect->currentRefreshTime -= diff;
-      } else
-      {
-        effect->callback(effect->callbackTimes, effect->currentFrameCount, effect);
-        effect->currentFrameCount++;
-        effect->currentRefreshTime = effect->frameRefreshTime;
-        if (effect->currentFrameCount >= effect->frameCount)
-        {
-          effect->currentFrameCount = 0;
-          if (effect->callbackTimes == 1)
-          {
-            effectDelete(effect);//必须逆向遍历
-          } else
-          {
-            if (effect->callbackTimes > 1)
-            {
-              effect->callbackTimes--;
-            }
-          }
-        }
-      }
-    }
-  }
-  preCheckTime = millis();
+  Director.loop(millis());
 }

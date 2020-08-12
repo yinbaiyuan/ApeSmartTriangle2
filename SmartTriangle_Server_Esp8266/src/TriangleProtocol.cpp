@@ -1,6 +1,6 @@
 #include "TriangleProtocol.h"
 #include <Arduino.h>
-#include <Vector.h>
+#include "Vector.h"
 
 struct PIdTimeoutDef
 {

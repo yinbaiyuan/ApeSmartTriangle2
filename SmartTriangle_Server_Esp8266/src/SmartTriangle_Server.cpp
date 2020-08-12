@@ -2,7 +2,8 @@
 #include "TriangleProtocol.h"
 #include "SmartTopology.h"
 #include <Vector.h>
-
+#include "ArduiDispatch/ArduiDispatch.h"
+#include "ArduiDispatch/ADHueAction.h"
 enum STLightType
 {
   STLT_WAITING_CHECK = 0,
@@ -20,65 +21,6 @@ STLightType stLightType;
 HalfDuplexSerial hdSerial(HDSERIAL_PIN);
 
 typedef void (*EffectCallback)(unsigned int, unsigned int, void *effect);
-
-struct STEffectCallbackDef
-{
-  uint32_t autoChangeTime;
-  uint32_t currentChangeTime;
-  uint16_t currentCallbackTimes;
-  uint16_t frameCount;
-  uint16_t currentFrameCount;
-  uint32_t frameRefreshTime;
-  uint32_t currentRefreshTime;
-  uint8_t custom8[6];
-  uint16_t custom16[3];
-  uint32_t custom32[1];
-  EffectCallback callback;
-};
-uint8_t effectPointer;
-uint32_t preCheckTime = 0;
-STEffectCallbackDef *stEffectCallbackDef_array[32];
-Vector<STEffectCallbackDef *> stEffectCallbackVec;
-
-STEffectCallbackDef *effectCreate(uint32_t n, uint16_t c, uint32_t t, EffectCallback callback)
-{
-  STEffectCallbackDef *effect = new STEffectCallbackDef();
-  effect->autoChangeTime = n;
-  effect->currentChangeTime = n;
-  effect->currentCallbackTimes = 0;
-  effect->frameCount = c;
-  effect->currentFrameCount = 0;
-  effect->frameRefreshTime = t;
-  effect->currentRefreshTime = 0;
-  effect->callback = callback;
-  stEffectCallbackVec.push_back(effect);
-  return effect;
-}
-
-void effectReset(uint32_t n)
-{
-  STEffectCallbackDef *effect = stEffectCallbackVec[n];
-  if(effect)
-  {
-    effect->currentChangeTime = effect->autoChangeTime;
-    effect->currentCallbackTimes = 0;
-    effect->currentFrameCount = 0;
-    effect->currentRefreshTime = 0;
-  }
-}
-
-void effectDelete(STEffectCallbackDef *effect)
-{
-  for (int i = stEffectCallbackVec.size() - 1; i >= 0; i--)
-  {
-    STEffectCallbackDef *e = stEffectCallbackVec[i];
-    if (effect == e)
-    {
-      stEffectCallbackVec.remove(i);
-      delete effect;
-    }
-  }
-}
 
 void waitingReceive()
 {
@@ -112,80 +54,44 @@ void seekRootNode()
 }
 
 
-void uniformColorEffect(unsigned int n, unsigned int c, void *effect)
+void uniformColorEffect(unsigned int c, void *effect)
 {
-  // Serial.println("uniformColorEffect n:" + String(n) + " c:" + String(c));
-  TPT.tpBegin(101).tpByte(255).tpUint16(5000).tpColor(0, 255, 0).tpTransmit();
+  ADLOG_SV("uniformColorEffect",c);
+  Serial.printf("%s: S:%d,H:%d,M:%d \n", "uniformColorEffect", ESP.getFreeContStack(), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
+  TPT.tpBegin(102).tpByte(255).tpUint16(1950).tpByte(random(0, 256)).tpTransmit();
 }
 
 void singleRandomEffect(unsigned int n, unsigned int c, void *effect)
 {
-  // Serial.println("randomEffect n:" + String(n) + " c:" + String(c));
-  TPT.tpBegin(102).tpByte(c).tpUint16(5000).tpByte(random(0, 256)).tpTransmit();
+  TPT.tpBegin(102).tpByte(c).tpUint16(1000).tpByte(random(0, 256)).tpTransmit();
 }
 
-void singleLedEffect(unsigned int n, unsigned int c, void *effect)
+void singleLedEffect(unsigned int c, void *effect)
 {
-  // Serial.println("uniformColorEffect n:" + String(n) + " c:" + String(c));
-  TPT.tpBegin(103).tpByte(255).tpUint16(5000).tpColor(0, 255, 0).tpTransmit();
+  ADLOG_SV("singleLedEffect",c);
+  TPT.tpBegin(103).tpByte(255).tpUint16(1950).tpByte(0).tpByte(255).tpTransmit();
 }
 
-void randomEffect(unsigned int n, unsigned int c, void *effect)
+void randomEffect(unsigned int c, void *action)
 {
-  // Serial.println("randomEffect n:" + String(n) + " c:" + String(c));
-  TPT.tpBegin(104).tpByte(255).tpUint16(3000).tpUint16(5000).tpTransmit();
+  // TPT.tpBegin(104).tpByte(255).tpUint16(3000).tpUint16(5000).tpTransmit();
 }
 
 void effectSetup()
 {
-  int count = ST.nodeCount();
-  effectCreate(5000*count,count,5000,randomEffect);
+  // uint32_t count = ST.nodeCount();
+
+  ADAction *randomAction = ADAction::create(uniformColorEffect,2000,3,0,false);
+  ADActor *randomActor = ADActor::create(6000,randomAction);
+  Director.addActor(randomActor);
+
+  ADAction *singleLeAction = ADAction::create(singleLedEffect,2000,3,0,false);
+  ADActor *singleLeActor = ADActor::create(6000,singleLeAction);
+  Director.addActor(singleLeActor);
+
+  // effectCreate(5000*count,count,5000,randomEffect);
   // effectCreate(10000,2,5000,uniformColorEffect);
   // effectCreate(10000,2,5000,singleLedEffect);
-}
-
-void effectClear()
-{
-  stEffectCallbackVec.clear();
-}
-
-void effectLoop()
-{
-  int effectSize = stEffectCallbackVec.size();
-  int diff = millis() - preCheckTime;
-  STEffectCallbackDef *effect = stEffectCallbackVec[effectPointer];
-  if (diff > 0)
-  {
-    if (effect->currentRefreshTime > (uint32_t)diff)
-    {
-      effect->currentRefreshTime -= diff;
-    }
-    else
-    {
-      effect->callback(effect->currentCallbackTimes, effect->currentFrameCount, effect);
-      effect->currentRefreshTime = effect->frameRefreshTime;
-      effect->currentFrameCount++;
-      if (effect->currentFrameCount >= effect->frameCount)
-      {
-        effect->currentFrameCount = 0;
-        effect->currentCallbackTimes++;
-      }
-    }
-
-    if(effect->currentChangeTime > (uint32_t)diff)
-    {
-      effect->currentChangeTime -= diff;
-    }else
-    {
-      effectPointer++;
-      if(effectPointer >= effectSize)
-      {
-        effectPointer = 0;
-      }
-      effectReset(effectPointer);
-    }
-  }
-  preCheckTime = millis();
 }
 
 void seekNodeByQueue()
@@ -193,9 +99,9 @@ void seekNodeByQueue()
   if (seekNodeQueue.size() <= 0)
   {
     stLightType = STLT_SHOW_EFFECT;
-    effectClear();
     effectSetup();
-    preCheckTime = millis();
+    Director.startAction(millis());
+    ADLOG_SV("START",millis());
     return;
   }
   STNodeDef *node = seekNodeQueue[0];
@@ -326,8 +232,6 @@ void setup()
   Serial.begin(115200);
   pinMode(D2, INPUT);
 
-  stEffectCallbackVec.setStorage(stEffectCallbackDef_array);
-
   hdSerial.begin(9600);
   hdSerial.setMode(SMT_TRANSMIT);
   pinMode(D7, INPUT_PULLUP);
@@ -337,6 +241,8 @@ void setup()
 
   TPT.tpBegin(1).tpByte(5).tpTransmit(); //所有节点初始化
   seekRootNode();
+
+  Director.begin(true);
 }
 
 void loop()
@@ -352,9 +258,9 @@ void loop()
   }
   if (stLightType == STLT_SHOW_EFFECT)
   {
-    effectLoop();
+    Director.loop(millis());
   }
-
+  
 
 
   // if(digitalRead(D2)==LOW)

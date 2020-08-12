@@ -28,40 +28,15 @@ void HalfDuplexSerial::end()
   m_serialModeType = SMT_NONE;
 }
 
-void HalfDuplexSerial::setMode(SerialModeType smt)
-{
-  switch (smt)
-  {
-    case SMT_TRANSMIT:
-      {
-        pinMode(m_pin, OUTPUT);
-        m_receiveSerial->end();
-        m_transmitSeirial->listen();
-        m_serialModeType = SMT_TRANSMIT;
-      }
-      break;
-    case SMT_RECEIVE:
-      {
-        pinMode(m_pin, INPUT_PULLUP);
-        m_transmitSeirial->end();
-        m_receiveSerial->listen();
-        m_serialModeType = SMT_RECEIVE;
-        
-      }
-      break;
-    default:
-      break;
-  }
-}
-
 size_t HalfDuplexSerial::write(uint8_t byte)
 {
   if (m_serialModeType == SMT_TRANSMIT)
   {
-    m_transmitSeirial->write(byte);
-  } else
+    return m_transmitSeirial->write(byte);
+  }
+  else
   {
-
+    return -1;
   }
 }
 
@@ -70,7 +45,8 @@ int HalfDuplexSerial::read()
   if (m_serialModeType == SMT_RECEIVE)
   {
     return m_receiveSerial->read();
-  } else
+  }
+  else
   {
     return -1;
   }
@@ -81,13 +57,52 @@ int HalfDuplexSerial::available()
   if (m_serialModeType == SMT_RECEIVE)
   {
     return m_receiveSerial->available();
-  } else
+  }
+  else
   {
     return 0;
   }
 }
 
-SerialModeType HalfDuplexSerial::serialModeType()
+void HalfDuplexSerial::setMode(SerialModeType smt)
 {
-  return m_serialModeType;
+  switch (smt)
+  {
+  case SMT_TRANSMIT:
+  {
+    pinMode(m_pin, OUTPUT);
+#if defined(ESP8266)
+    m_transmitSeirial->listen();
+    m_transmitSeirial->flush();
+    m_transmitSeirial->enableRx(false);
+    m_transmitSeirial->enableTx(true);
+    m_receiveSerial->enableRx(false);
+    m_receiveSerial->enableTx(false);
+#else
+    m_receiveSerial->end();
+    m_transmitSeirial->listen();
+#endif
+    m_serialModeType = SMT_TRANSMIT;
+  }
+  break;
+  case SMT_RECEIVE:
+  {
+    pinMode(m_pin, INPUT_PULLUP);
+#if defined(ESP8266)
+    m_receiveSerial->listen();
+    m_receiveSerial->flush();
+    m_transmitSeirial->enableRx(false);
+    m_transmitSeirial->enableTx(false);
+    m_receiveSerial->enableRx(true);
+    m_receiveSerial->enableTx(false);
+#else
+    m_transmitSeirial->end();
+    m_receiveSerial->listen();
+#endif
+    m_serialModeType = SMT_RECEIVE;
+  }
+  break;
+  default:
+    break;
+  }
 }

@@ -1,7 +1,6 @@
 #ifndef HalfDuplexSerial_h
 #define HalfDuplexSerial_h
 
-#include <inttypes.h>
 #include <SoftwareSerial.h>
 
 enum SerialModeType
@@ -10,7 +9,6 @@ enum SerialModeType
     SMT_TRANSMIT = 1,
     SMT_RECEIVE,
 };
-
 
 class HalfDuplexSerial
 {
@@ -24,11 +22,13 @@ public:
     ~HalfDuplexSerial();
     void begin(long speed);
     void end();
-    void setMode(SerialModeType smt);
     size_t write(uint8_t byte);
     int read();
     int available();
-    SerialModeType serialModeType();
+
+    void setMode(SerialModeType smt);
+    SerialModeType serialModeType(){return m_serialModeType;}
+    
 };
 
 #endif
