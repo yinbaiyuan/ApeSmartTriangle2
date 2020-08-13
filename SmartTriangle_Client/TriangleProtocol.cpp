@@ -48,7 +48,8 @@ uint16_t TriangleProtocol::CRC16_MODBUS(uint8_t *data, uint16_t datalen)
         wCRCin = wCRCin >> 1;
     }
   }
-  return wCRCin>>8 & 0x00FF + wCRCin<<8 & 0xFF00;
+  uint16_t wCRCinTemp = wCRCin;
+  return (wCRCin>>8 & 0x00FF) | (wCRCinTemp<<8 & 0xFF00);
 }
 
 void TriangleProtocol::waitProtocolTimeout(uint8_t pId, uint32_t timeout)
@@ -164,7 +165,6 @@ TriangleProtocol &TriangleProtocol::tpBeginReceive()
 
 TriangleProtocol &TriangleProtocol::tpPushData(uint8_t d)
 {
-  //  Serial.println("d:"+String(d)+" m_ptLength:"+String(m_ptLength));
   if (m_ptLength == 0 && d != 0) //开头过滤
   {
     return TPT;

@@ -15,15 +15,18 @@ enum STLightType
 };
 
 STNodeDef *seekNodeQueue_storage[64];
+
 Vector<STNodeDef *> seekNodeQueue;
+
 STNodeDef *currentNode;
+
 STLightType stLightType;
+
 #define HDSERIAL_PIN D6
+
 #define SLECTED_PIN D5
 
 HalfDuplexSerial hdSerial(HDSERIAL_PIN);
-
-typedef void (*EffectCallback)(unsigned int, unsigned int, void *effect);
 
 void waitingReceive()
 {
@@ -242,12 +245,11 @@ void setup()
   pinMode(D7, INPUT_PULLUP);
   TPT.callbackRegister(tpCallback, transmitCallback);
 
+  delay(200);
   Serial.println("STARTING...");
-  delay(2000);
-
-  TPT.tpBegin(1).tpByte(5).tpTransmit(); //所有节点初始化
+  TPT.tpBegin(1).tpTransmit(); //所有节点初始化
+  delay(50);
   seekRootNode();
-
   Director.begin(true);
 }
 
