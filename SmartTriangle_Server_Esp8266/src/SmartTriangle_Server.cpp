@@ -4,6 +4,9 @@
 #include <Vector.h>
 #include "ArduiDispatch/ArduiDispatch.h"
 #include "ArduiDispatch/ADHueAction.h"
+
+#define PROTOCOL_VER  "0.1.0"
+
 enum STLightType
 {
   STLT_WAITING_CHECK = 0,
@@ -218,9 +221,11 @@ void tpCallback(byte pId, byte *payload, unsigned int length, bool isTimeout)
 
 void transmitCallback(byte *ptBuffer, unsigned int ptLength)
 {
+  ADLOG_V(ptLength);
   for (unsigned int i = 0; i < ptLength; i++)
   {
-    int c = ptBuffer[i];
+    uint8_t c = ptBuffer[i];
+    Serial.println(c,HEX);
     hdSerial.write(c);
   }
 }
@@ -237,7 +242,8 @@ void setup()
   pinMode(D7, INPUT_PULLUP);
   TPT.callbackRegister(tpCallback, transmitCallback);
 
-  delay(200);
+  Serial.println("STARTING...");
+  delay(2000);
 
   TPT.tpBegin(1).tpByte(5).tpTransmit(); //所有节点初始化
   seekRootNode();

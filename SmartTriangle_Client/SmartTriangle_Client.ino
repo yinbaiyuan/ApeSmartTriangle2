@@ -1,32 +1,38 @@
 #include "HalfDuplexSerial.h"
 #include "TriangleProtocol.h"
-#include <FastLED.h>
 #include "ArduiDispatch.h"
 #include "ADHueAction.h"
 #include "MemoryFree.h"
-#define HDSERIAL_PIN 10
-#define NUM_LEDS 15
-#define LED_PIN 4
+#include <FastLED.h>
+
+#define HDSERIAL_PIN  10
+#define NUM_LEDS      15
+#define LED_PIN       4
+
+enum TriangleStateType
+{
+  TST_NONE          = 0,
+  TST_WATING_LOCATE = 1,
+  TST_LOCATED       = 2,
+};
 
 HalfDuplexSerial hdSerial(HDSERIAL_PIN);
 
 CRGB leds[NUM_LEDS];
 
-enum TriangleStateType
-{
-  TST_NONE = 0,
-  TST_WATING_LOCATE = 1,
-  TST_LOCATED = 2,
-};
-
 int selectPin[3] = {6, 7, 8};
+
 uint16_t ledNumOffset = 0;
 
 TriangleStateType m_triangleStateType;
-int m_fatherNodePin = -1;
-int m_leftLeafNodePin = -1;
-int m_rightLeafNodePin = -1;
-int m_nodeId = -1;
+
+int m_fatherNodePin     = -1;
+
+int m_leftLeafNodePin   = -1;
+
+int m_rightLeafNodePin  = -1;
+
+int m_nodeId            = -1;
 
 uint16_t ledNumsConverter(uint16_t n)
 {
@@ -110,7 +116,7 @@ void topologyInit()
   m_leftLeafNodePin = -1;
   m_rightLeafNodePin = -1;
   m_nodeId = -1;
-//  Director.flush();
+  //  Director.flush();
   Serial.println("TOPOLOGY RESET");
 }
 
@@ -149,16 +155,16 @@ void effect102Callback(uint8_t h, void *e)
 
 void effect103Callback(uint8_t h, void *e)
 {
-    for (int i = 0; i < NUM_LEDS; i++) {
-      leds[ledNumsConverter(i)] = CHSV((h + i*10) % 256, 255, 255);
-    }
-    FastLED.show();
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[ledNumsConverter(i)] = CHSV((h + i * 10) % 256, 255, 255);
+  }
+  FastLED.show();
 }
 
 void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
 {
   Serial.println("tpCallback pId:" + String(pId) + " Timeout:" + String(isTimeout ? "True" : "False"));
-            ADLOG_V(freeMemory());
+  ADLOG_V(freeMemory());
   switch (pId)
   {
     case 1:
@@ -236,9 +242,9 @@ void tpCallback(byte pId, byte *payload, unsigned int length , bool isTimeout)
         if (m_nodeId == payload[0] || payload[0] == 255)
         {
           uint16_t t = uint16_t(payload[1] << 8) + uint16_t(payload[2]);
-//          ADHueAction *action = ADHueAction::create(effect101Callback, payload[3], payload[4], t);
-//          ADActor *testActor = ADActor::create(t, action);
-//          Director.addActor(testActor);
+          //          ADHueAction *action = ADHueAction::create(effect101Callback, payload[3], payload[4], t);
+          //          ADActor *testActor = ADActor::create(t, action);
+          //          Director.addActor(testActor);
         }
       }
       break;
@@ -281,6 +287,7 @@ void transmitCallback(byte *ptBuffer, unsigned int ptLength)
   for (int i = 0; i < ptLength; i++)
   {
     byte c = ptBuffer[i];
+    Serial.write(c);
     hdSerial.write(c);
   }
 }

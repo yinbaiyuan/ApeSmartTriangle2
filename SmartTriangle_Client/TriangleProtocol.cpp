@@ -1,46 +1,100 @@
 #include "TriangleProtocol.h"
-#include <Arduino.h>
-#include "Vector.h"
-
-struct PIdTimeoutDef
-{
-  uint8_t pId;
-  uint32_t recordTime;
-  uint32_t timeout;
-};
-
-PIdTimeoutDef *pIdTimeoutVec_array[10];
-Vector<PIdTimeoutDef *> pIdTimeoutVec;
-
-#define MAX_PROTOCOL_BUFFER 512
 
 static uint8_t m_ptBuffer[MAX_PROTOCOL_BUFFER];
-static uint8_t m_ptLength;
+
+static uint16_t m_ptLength;
 
 TriangleProtocol::TriangleProtocol()
 {
-  this->callback = NULL;
+  this->parse_callback = NULL;
   this->trans_callback = NULL;
-  pIdTimeoutVec.setStorage(pIdTimeoutVec_array);
+  m_protoCallbackVec.setStorage(m_protoCallbackVec_array);
 }
 
 TriangleProtocol::~TriangleProtocol()
 {
-  this->callback = NULL;
-  this->trans_callback = NULL;
 }
 
 void TriangleProtocol::callbackRegister(TP_PARSE_CALLBACK, TP_TRANSMIT_CALLBACK)
 {
-  this->callback = callback;
+  this->parse_callback = parse_callback;
   this->trans_callback = trans_callback;
+}
+
+void TriangleProtocol::InvertUint16(uint16_t *dBuf, uint16_t *srcBuf)
+{
+  uint16_t tmp[4] = {0};
+  for (uint8_t i = 0; i < 16; i++)
+  {
+    if (srcBuf[0] & (1 << i))
+      tmp[0] |= 1 << (15 - i);
+  }
+  dBuf[0] = tmp[0];
+}
+
+uint16_t TriangleProtocol::CRC16_MODBUS(uint8_t *data, uint16_t datalen)
+{
+  uint16_t wCRCin = 0xFFFF;
+  uint16_t wCPoly = 0x8005;
+  InvertUint16(&wCPoly, &wCPoly);
+  while (datalen--)
+  {
+    wCRCin ^= *(data++);
+    for (uint8_t i = 0; i < 8; i++)
+    {
+      if (wCRCin & 0x01)
+        wCRCin = (wCRCin >> 1) ^ wCPoly;
+      else
+        wCRCin = wCRCin >> 1;
+    }
+  }
+  return wCRCin>>8 & 0x00FF + wCRCin<<8 & 0xFF00;
+}
+
+void TriangleProtocol::waitProtocolTimeout(uint8_t pId, uint32_t timeout)
+{
+  ProtocolCallbackDef *protocolCallbackDef = new ProtocolCallbackDef();
+  protocolCallbackDef->pId = pId;
+  protocolCallbackDef->recordTime = millis();
+  protocolCallbackDef->timeout = timeout;
+  m_protoCallbackVec.push_back(protocolCallbackDef);
+}
+
+void TriangleProtocol::protocolTimeoutRemove(uint8_t pId)
+{
+  for (int i = m_protoCallbackVec.size() - 1; i >= 0; i--)
+  {
+    ProtocolCallbackDef *protocolCallbackDef = m_protoCallbackVec[i];
+    if (protocolCallbackDef->pId == pId)
+    {
+      m_protoCallbackVec.remove(i);
+      delete protocolCallbackDef;
+      protocolCallbackDef = NULL;
+    }
+  }
+}
+
+void TriangleProtocol::protocolLoop()
+{
+  for (int i = m_protoCallbackVec.size() - 1; i >= 0; i--)
+  {
+    ProtocolCallbackDef *protocolCallbackDef = m_protoCallbackVec[i];
+    if (millis() - protocolCallbackDef->recordTime > protocolCallbackDef->timeout)
+    {
+      this->parse_callback(protocolCallbackDef->pId, NULL, 0, true);
+      m_protoCallbackVec.remove(i);
+      delete protocolCallbackDef;
+      protocolCallbackDef = NULL;
+    }
+  }
 }
 
 TriangleProtocol &TriangleProtocol::tpBegin(byte pid)
 {
   m_ptBuffer[0] = 0;
   m_ptBuffer[1] = 0;
-  m_ptLength = 2;
+  m_ptBuffer[2] = 0;
+  m_ptLength = 3;
   m_ptBuffer[m_ptLength++] = pid;
   return TPT;
 }
@@ -88,13 +142,16 @@ TriangleProtocol &TriangleProtocol::tpStr(const String &str)
 
 void TriangleProtocol::tpTransmit(bool checkTimeout)
 {
-  m_ptBuffer[m_ptLength] = m_ptLength + 1;
-  m_ptBuffer[1] = m_ptLength + 1;
+  m_ptBuffer[1] = ((m_ptLength+2) >> 8) & 0xFF;
+  m_ptBuffer[2] = ((m_ptLength+2) >> 0) & 0xFF;
 
-  this->trans_callback(m_ptBuffer, m_ptLength + 1);
+  uint16_t crc = this->CRC16_MODBUS(m_ptBuffer,m_ptLength);
+  this->tpUint16(crc);
+  
+  this->trans_callback(m_ptBuffer, m_ptLength);
   if (checkTimeout)
   {
-    this->waitProtocolTimeout(m_ptBuffer[2]);
+    this->waitProtocolTimeout(m_ptBuffer[3]);
   }
 }
 
@@ -108,7 +165,7 @@ TriangleProtocol &TriangleProtocol::tpBeginReceive()
 TriangleProtocol &TriangleProtocol::tpPushData(uint8_t d)
 {
   //  Serial.println("d:"+String(d)+" m_ptLength:"+String(m_ptLength));
-  if (m_ptLength == 0 && d != 0)
+  if (m_ptLength == 0 && d != 0) //开头过滤
   {
     return TPT;
   }
@@ -118,63 +175,20 @@ TriangleProtocol &TriangleProtocol::tpPushData(uint8_t d)
 
 void TriangleProtocol::tpParse()
 {
-  uint8_t pLength = m_ptBuffer[1];
-  if (pLength <= 2)
-    return;
-  if (pLength > m_ptLength)
-    return;
+  if(m_ptLength < 3) return;
+  uint16_t pLength = uint16_t(m_ptBuffer[1]<<8) + uint16_t(m_ptBuffer[2]);
+  if (pLength < 6) return; //无有效载荷，协议至少六位
+  if (pLength > m_ptLength) return; //未完全接收数据，等待
   if (pLength <= m_ptLength)
   {
-    if (pLength != m_ptBuffer[pLength - 1])
+    if (this->CRC16_MODBUS(m_ptBuffer,pLength) == 0)//crc校验
     {
-      //数据校验失败
-    }
-    else
-    {
-      //符合解析条件
-      uint8_t pId = m_ptBuffer[2];
+      uint8_t pId = m_ptBuffer[3];
       this->protocolTimeoutRemove(pId);
-      this->callback(pId, m_ptBuffer + 3, pLength - 3, false);
+      this->parse_callback(pId, m_ptBuffer + 4, pLength - 4, false);
     }
   }
-  TPT.tpBeginReceive();
-}
-
-void TriangleProtocol::waitProtocolTimeout(uint8_t pId, uint32_t timeout)
-{
-  PIdTimeoutDef *pIdTimeoutDef = new PIdTimeoutDef();
-  pIdTimeoutDef->pId = pId;
-  pIdTimeoutDef->recordTime = millis();
-  pIdTimeoutDef->timeout = timeout;
-  pIdTimeoutVec.push_back(pIdTimeoutDef);
-}
-
-void TriangleProtocol::protocolTimeoutRemove(uint8_t pId)
-{
-  for (int i = pIdTimeoutVec.size() - 1; i >= 0; i--)
-  {
-    PIdTimeoutDef *pIdTimeoutDef = pIdTimeoutVec[i];
-    if (pIdTimeoutDef->pId == pId)
-    {
-      pIdTimeoutVec.remove(i);
-      delete pIdTimeoutDef;
-      pIdTimeoutDef = NULL;
-    }
-  }
-}
-void TriangleProtocol::protocolLoop()
-{
-  for (int i = pIdTimeoutVec.size() - 1; i >= 0; i--)
-  {
-    PIdTimeoutDef *pIdTimeoutDef = pIdTimeoutVec[i];
-    if (millis() - pIdTimeoutDef->recordTime > pIdTimeoutDef->timeout)
-    {
-      this->callback(pIdTimeoutDef->pId, NULL, 0, true);
-      pIdTimeoutVec.remove(i);
-      delete pIdTimeoutDef;
-      pIdTimeoutDef = NULL;
-    }
-  }
+  TPT.tpBeginReceive();//协议缓存重置
 }
 
 TriangleProtocol TPT;
