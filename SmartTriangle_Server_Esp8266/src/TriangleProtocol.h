@@ -56,7 +56,7 @@ public:
     [5]-[n]:协议有效负载
     [n+1][n+2]:CRC校验码
 */
-  TriangleProtocol &tpBegin(byte pid);
+  TriangleProtocol &tpBegin(byte pid,byte nid);
 
   TriangleProtocol &tpByte(byte b);
 

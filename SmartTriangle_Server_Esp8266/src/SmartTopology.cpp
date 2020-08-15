@@ -5,11 +5,11 @@
 STNodeDef *stNodeStack_storage[64];
 Vector<STNodeDef *> stNodeStack;
 
-static uint8_t idCreator = 0;
+static uint8_t idCreator = 1;
 
 SmartTopology::SmartTopology()
 {
-  idCreator = 0;
+  idCreator = 1;
   m_rootNode = NULL;
   stNodeStack.setStorage(stNodeStack_storage);
 }
@@ -99,7 +99,7 @@ STNodeDef *SmartTopology::rootNode()
 
 void SmartTopology::flush()
 {
-  idCreator = 0;
+  idCreator = 1;
   this->deleteTree(m_rootNode);
 }
 

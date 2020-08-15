@@ -38,13 +38,15 @@ void ADDirector ::begin(bool autoSwitch)
 
 void ADDirector ::loop(uint32_t ct)
 {
-    if (_invalid)
-        return;
-
     if (_lastMillis >= ct)
         return;
 
     uint32_t dt = ct - _lastMillis;
+
+    _lastMillis = ct;
+
+    if (_invalid)
+        return;
 
     ADActor *actor = _actorVec[_autoSwitchPointer];
 
@@ -60,7 +62,7 @@ void ADDirector ::loop(uint32_t ct)
             _autoSwitchPointer = 0;
         }
     }
-    _lastMillis = ct;
+
 }
 
 void ADDirector::addActor(ADActor *actor)
@@ -86,23 +88,23 @@ void ADDirector::removeActor(ADActor *actor, bool autoDelete)
 
 void ADDirector::removeActor(uint32_t index, bool autoDelete)
 {
-  ADActor *actor = _actorVec[index];
-  if (actor)
-  {
-    _actorVec.remove(index);
-    if (autoDelete)
+    ADActor *actor = _actorVec[index];
+    if (actor)
     {
-      actor->release();
+        _actorVec.remove(index);
+        if (autoDelete)
+        {
+            actor->release();
+        }
     }
-  }
 }
 
 void ADDirector::flush()
 {
-  this->stopAction();
-  for (int i = _actorVec.size() - 1; i >= 0; i--)
-  {
-    this->removeActor(i,true);
-  }
+    this->stopAction();
+    for (int i = _actorVec.size() - 1; i >= 0; i--)
+    {
+        this->removeActor(i, true);
+    }
 }
 ADDirector Director;

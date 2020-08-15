@@ -24,7 +24,6 @@ void ADAction::callbackAction()
 
 void ADAction::callback()
 {
-    ADLOG_S("ADAction callback");
     _callback(_times_c, this);
 }
 
@@ -58,7 +57,7 @@ bool ADAction::actNow(uint32_t dt)
         if (_times_c == 0)
         {
             this->callbackAction();
-        }
+        }   
         if (_interval_c > dt)
         {
             _interval_c -= dt;
@@ -67,7 +66,9 @@ bool ADAction::actNow(uint32_t dt)
         {
             _interval_c = 0;
         }
+        
     }
+
     if (_delay_c == 0 && _interval_c == 0)
     {
         if (_times != 0 && _times_c >= _times)

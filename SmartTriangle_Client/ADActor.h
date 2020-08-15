@@ -8,7 +8,7 @@
 class ADActor
 {
 private:
-    ADAction *_actionVec_array[3];
+    ADAction *_actionVec_array[10];
 
     Vector<ADAction *> _actionVec;
 

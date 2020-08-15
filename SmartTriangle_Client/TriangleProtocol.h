@@ -18,7 +18,7 @@ struct ProtocolCallbackDef
 
 #define DEFAULT_PROTOCO_TIMEOUT 200
 
-#define MAX_PROTOCOL_BUFFER 512
+#define MAX_PROTOCOL_BUFFER 256
 
 class TriangleProtocol
 {
@@ -26,10 +26,6 @@ private:
   TP_PARSE_CALLBACK;
 
   TP_TRANSMIT_CALLBACK;
-
-  ProtocolCallbackDef *m_protoCallbackVec_array[10];
-
-  Vector<ProtocolCallbackDef *> m_protoCallbackVec;
 
   void protocolTimeoutRemove(uint8_t pId);
 
@@ -56,7 +52,7 @@ public:
     [5]-[n]:协议有效负载
     [n+1][n+2]:CRC校验码
 */
-  TriangleProtocol &tpBegin(byte pid);
+  TriangleProtocol &tpBegin(byte pid,byte nid);
 
   TriangleProtocol &tpByte(byte b);
 

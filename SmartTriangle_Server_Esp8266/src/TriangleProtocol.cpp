@@ -90,13 +90,14 @@ void TriangleProtocol::protocolLoop()
   }
 }
 
-TriangleProtocol &TriangleProtocol::tpBegin(byte pid)
+TriangleProtocol &TriangleProtocol::tpBegin(byte pid,byte nid)
 {
   m_ptBuffer[0] = 0;
   m_ptBuffer[1] = 0;
   m_ptBuffer[2] = 0;
   m_ptLength = 3;
   m_ptBuffer[m_ptLength++] = pid;
+  m_ptBuffer[m_ptLength++] = nid;
   return TPT;
 }
 

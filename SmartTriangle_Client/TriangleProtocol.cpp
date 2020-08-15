@@ -1,8 +1,12 @@
 #include "TriangleProtocol.h"
 
-static uint8_t m_ptBuffer[MAX_PROTOCOL_BUFFER];
+uint8_t m_ptBuffer[MAX_PROTOCOL_BUFFER];
 
-static uint16_t m_ptLength;
+uint16_t m_ptLength;
+
+ProtocolCallbackDef *m_protoCallbackVec_array[10];
+
+Vector<ProtocolCallbackDef *> m_protoCallbackVec;
 
 TriangleProtocol::TriangleProtocol()
 {
@@ -49,7 +53,7 @@ uint16_t TriangleProtocol::CRC16_MODBUS(uint8_t *data, uint16_t datalen)
     }
   }
   uint16_t wCRCinTemp = wCRCin;
-  return (wCRCin>>8 & 0x00FF) | (wCRCinTemp<<8 & 0xFF00);
+  return (wCRCin >> 8 & 0x00FF) | (wCRCinTemp << 8 & 0xFF00);
 }
 
 void TriangleProtocol::waitProtocolTimeout(uint8_t pId, uint32_t timeout)
@@ -90,13 +94,14 @@ void TriangleProtocol::protocolLoop()
   }
 }
 
-TriangleProtocol &TriangleProtocol::tpBegin(byte pid)
+TriangleProtocol &TriangleProtocol::tpBegin(byte pid, byte nid)
 {
   m_ptBuffer[0] = 0;
   m_ptBuffer[1] = 0;
   m_ptBuffer[2] = 0;
   m_ptLength = 3;
   m_ptBuffer[m_ptLength++] = pid;
+  m_ptBuffer[m_ptLength++] = nid;
   return TPT;
 }
 
@@ -143,12 +148,12 @@ TriangleProtocol &TriangleProtocol::tpStr(const String &str)
 
 void TriangleProtocol::tpTransmit(bool checkTimeout)
 {
-  m_ptBuffer[1] = ((m_ptLength+2) >> 8) & 0xFF;
-  m_ptBuffer[2] = ((m_ptLength+2) >> 0) & 0xFF;
+  m_ptBuffer[1] = ((m_ptLength + 2) >> 8) & 0xFF;
+  m_ptBuffer[2] = ((m_ptLength + 2) >> 0) & 0xFF;
 
-  uint16_t crc = this->CRC16_MODBUS(m_ptBuffer,m_ptLength);
+  uint16_t crc = this->CRC16_MODBUS(m_ptBuffer, m_ptLength);
   this->tpUint16(crc);
-  
+
   this->trans_callback(m_ptBuffer, m_ptLength);
   if (checkTimeout)
   {
@@ -175,17 +180,32 @@ TriangleProtocol &TriangleProtocol::tpPushData(uint8_t d)
 
 void TriangleProtocol::tpParse()
 {
-  if(m_ptLength < 3) return;
-  uint16_t pLength = uint16_t(m_ptBuffer[1]<<8) + uint16_t(m_ptBuffer[2]);
+  //  Serial.println("m_ptLength:" + String(m_ptLength));
+  if (m_ptLength < 3) return;
+  uint16_t pLength = uint16_t(m_ptBuffer[1] << 8) + uint16_t(m_ptBuffer[2]);
+  //  Serial.println("pLength:" + String(pLength));
+  if (pLength > MAX_PROTOCOL_BUFFER)
+  {
+    TPT.tpBeginReceive();//协议缓存重置
+    return;
+  }
   if (pLength < 6) return; //无有效载荷，协议至少六位
+
   if (pLength > m_ptLength) return; //未完全接收数据，等待
   if (pLength <= m_ptLength)
   {
-    if (this->CRC16_MODBUS(m_ptBuffer,pLength) == 0)//crc校验
+    if (this->CRC16_MODBUS(m_ptBuffer, pLength) == 0) //crc校验
     {
       uint8_t pId = m_ptBuffer[3];
       this->protocolTimeoutRemove(pId);
       this->parse_callback(pId, m_ptBuffer + 4, pLength - 4, false);
+    } else
+    {
+      for (int i = 0; i < pLength; i++)
+      {
+        Serial.println("m_ptBuffer[" + String(i) + "]=" + String(m_ptBuffer[i]));
+      }
+      Serial.println("parse failed");
     }
   }
   TPT.tpBeginReceive();//协议缓存重置

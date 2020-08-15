@@ -24,13 +24,12 @@ void ADAction::callbackAction()
 
 void ADAction::callback()
 {
-    ADLOG_S("ADAction callback");
     _callback(_times_c, this);
 }
 
 ADAction *ADAction::create(ActionCallback func, uint32_t interval, uint32_t times,uint32_t delay,  bool autoDelete)
 {
-    ADAction *action = new ADAction(func, delay, interval, times, autoDelete);
+    ADAction *action = new ADAction(func, interval,times,delay,autoDelete);
     return action;
 }
 
