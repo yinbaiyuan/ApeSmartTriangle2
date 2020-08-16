@@ -1,12 +1,8 @@
 #include "TriangleProtocol.h"
 
-uint8_t m_ptBuffer[MAX_PROTOCOL_BUFFER];
+static uint8_t m_ptBuffer[MAX_PROTOCOL_BUFFER];
 
-uint16_t m_ptLength;
-
-ProtocolCallbackDef *m_protoCallbackVec_array[10];
-
-Vector<ProtocolCallbackDef *> m_protoCallbackVec;
+static uint16_t m_ptLength;
 
 TriangleProtocol::TriangleProtocol()
 {
@@ -180,18 +176,18 @@ TriangleProtocol &TriangleProtocol::tpPushData(uint8_t d)
 
 void TriangleProtocol::tpParse()
 {
-  //  Serial.println("m_ptLength:" + String(m_ptLength));
-  if (m_ptLength < 3) return;
+  if (m_ptLength < 3)
+    return;
   uint16_t pLength = uint16_t(m_ptBuffer[1] << 8) + uint16_t(m_ptBuffer[2]);
-  //  Serial.println("pLength:" + String(pLength));
   if (pLength > MAX_PROTOCOL_BUFFER)
   {
     TPT.tpBeginReceive();//协议缓存重置
     return;
   }
-  if (pLength < 6) return; //无有效载荷，协议至少六位
-
-  if (pLength > m_ptLength) return; //未完全接收数据，等待
+  if (pLength < 6)
+    return; //无有效载荷，协议至少六位
+  if (pLength > m_ptLength)
+    return; //未完全接收数据，等待
   if (pLength <= m_ptLength)
   {
     if (this->CRC16_MODBUS(m_ptBuffer, pLength) == 0) //crc校验
@@ -209,6 +205,20 @@ void TriangleProtocol::tpParse()
     }
   }
   TPT.tpBeginReceive();//协议缓存重置
+}
+
+String TriangleProtocol::parseString(uint8_t *payload) const
+{
+  uint8_t stringLength = payload[0];
+  char *buff = (char *)malloc(stringLength + 1);
+  memset(buff, 0, stringLength + 1);
+  for (int i = 0; i < stringLength; i++)
+  {
+    buff[i] = payload[i + 1];
+  }
+  String res = String(buff);
+  delete buff;
+  return res;
 }
 
 TriangleProtocol TPT;

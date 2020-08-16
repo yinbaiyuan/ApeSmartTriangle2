@@ -50,6 +50,8 @@ int m_rightLeafNodePin = -1;
 
 uint8_t m_nodeId = 254; // 254 代表未分配ID
 
+bool m_debugMode = false;
+
 uint16_t ledNumsConverter(uint16_t n)
 {
   return (n + ledNumOffset) % NUM_LEDS;
@@ -128,9 +130,9 @@ void flush()
   m_rightLeafNodePin = -1;
   m_nodeId = 254;
   Director.flush();
-  Director.startAction(millis());
   FastLED.clear();
   FastLED.show();
+  Director.startAction(millis());
   Serial.println("TOPOLOGY RESET");
 }
 
@@ -155,6 +157,8 @@ PROTOCOL_CALLBACK(1)
 {
   flush();
   LEDS.setBrightness(payload[0]);
+  m_debugMode = payload[1] > 0 & 0x01;
+  ADLOG_V(m_debugMode);
 }
 
 //分配ID
@@ -199,7 +203,7 @@ PROTOCOL_CALLBACK(51)
   {
     //确认上级节点位置
     m_triangleStateType = TST_WATING_LOCATE;
-    TPT.tpBegin(51, 0);
+    TPT.tpBegin(51, 0).tpStr(PROTOCOL_VER);
     transmitAction();
   }
 }
@@ -211,7 +215,7 @@ PROTOCOL_CALLBACK(52)
   {
     //确认上级节点位置
     m_triangleStateType = TST_WATING_LOCATE;
-    TPT.tpBegin(52, 0);
+    TPT.tpBegin(52, 0).tpStr(PROTOCOL_VER);
     transmitAction();
   }
 }
@@ -352,7 +356,7 @@ void tpCallback(byte pId, byte *payload, unsigned int length, bool isTimeout)
   Serial.println("<<==Rec. " + String(pId) + (isTimeout ? " T " : " F ") + String(freeMemory()));
   if (m_triangleStateType == TST_NONE && pId >= 100)
   {
-    Serial.println("==>>");
+    Serial.println(" DIS==>>");
     return;
   }
   switch (pId)
@@ -415,7 +419,7 @@ void setup()
 
   LEDS.setBrightness(200);
 
-  hdSerial.begin(9600);
+  hdSerial.begin(57600);
 
   hdSerial.setMode(SMT_RECEIVE);
 

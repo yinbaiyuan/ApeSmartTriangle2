@@ -84,7 +84,7 @@ void ADDirector::addActor(ADActor *actor)
 
 void ADDirector::removeActor(ADActor *actor, bool autoDelete)
 {
-  for (int i = 0; i < _actorVec.size(); i++)
+  for (uint32_t i = 0; i < _actorVec.size(); i++)
   {
     if (actor == _actorVec[i])
     {

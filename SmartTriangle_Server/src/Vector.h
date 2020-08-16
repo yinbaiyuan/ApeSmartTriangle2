@@ -85,6 +85,6 @@ inline Print & operator <<(Print & stream,
   return stream;
 }
 
-#include "Vector/VectorDefinitions.h"
+#include "VectorDefinitions.h"
 
 #endif

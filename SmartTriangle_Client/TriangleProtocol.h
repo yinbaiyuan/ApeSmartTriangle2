@@ -27,6 +27,10 @@ private:
 
   TP_TRANSMIT_CALLBACK;
 
+  ProtocolCallbackDef *m_protoCallbackVec_array[10];
+
+  Vector<ProtocolCallbackDef *> m_protoCallbackVec;
+
   void protocolTimeoutRemove(uint8_t pId);
 
   void InvertUint16(uint16_t *dBuf, uint16_t *srcBuf);
@@ -71,6 +75,8 @@ public:
   TriangleProtocol &tpPushData(uint8_t d);
 
   void tpParse();
+
+  String parseString(uint8_t *payload) const;
 
   
 };

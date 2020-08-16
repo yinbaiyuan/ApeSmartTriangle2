@@ -18,7 +18,7 @@ struct ProtocolCallbackDef
 
 #define DEFAULT_PROTOCO_TIMEOUT 200
 
-#define MAX_PROTOCOL_BUFFER 512
+#define MAX_PROTOCOL_BUFFER 256
 
 class TriangleProtocol
 {
@@ -75,6 +75,8 @@ public:
   TriangleProtocol &tpPushData(uint8_t d);
 
   void tpParse();
+
+  String parseString(uint8_t *payload) const;
 
   
 };

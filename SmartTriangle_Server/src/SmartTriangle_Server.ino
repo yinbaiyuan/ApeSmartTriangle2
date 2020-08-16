@@ -2,8 +2,8 @@
 #include "TriangleProtocol.h"
 #include "SmartTopology.h"
 #include <Vector.h>
-#include "ArduiDispatch/ArduiDispatch.h"
-#include "ArduiDispatch/ADHueAction.h"
+#include "ArduiDispatch.h"
+#include "ADHueAction.h"
 
 #define PROTOCOL_VER "0.1.0"
 
@@ -18,9 +18,15 @@
   }                                                               \
   break
 
-#define HDSERIAL_PIN D6
-
-#define SLECTED_PIN D5
+#if defined ESP8266
+    #define HDSERIAL_PIN D6
+    #define HDSERIAL_PIN_BAKE D7
+    #define SLECTED_PIN D5
+#elif defined ARDUINO
+    #define HDSERIAL_PIN 6
+    #define HDSERIAL_PIN_BAKE 7
+    #define SLECTED_PIN 5
+#endif
 
 enum STLightType
 {
@@ -117,8 +123,9 @@ void seekNodeByQueue()
   {
     stLightType = STLT_SHOW_EFFECT;
     effectSetup();
-    Director.startAction(millis());
     ADLOG_SV("Topo SUCCESSED!!!", millis());
+    delay(1000);
+    Director.startAction(millis());
     return;
   }
   STNodeDef *node = seekNodeQueue[0];
@@ -150,12 +157,11 @@ void seekLeafNode()
 
 void transmitCallback(byte *ptBuffer, unsigned int ptLength)
 {
-  Serial.print("Sent pID=" + String(ptBuffer[3]) +  " Length=" + String(ptLength) + " ");
-  ADLOG_V(ESP.getMaxFreeBlockSize());
+  Serial.println("Sent pID=" + String(ptBuffer[3]) +  " Length=" + String(ptLength) + " ");
+//  ADLOG_V(ESP.getMaxFreeBlockSize());
   for (unsigned int i = 0; i < ptLength; i++)
   {
     uint8_t c = ptBuffer[i];
-    Serial.println(c);
     hdSerial.write(c);
   }
 }
@@ -163,6 +169,7 @@ void transmitCallback(byte *ptBuffer, unsigned int ptLength)
 PROTOCOL_CALLBACK(51)
 {
   stopSelect();
+  Serial.println(TPT.parseString(payload));
   if (isTimeout)
   {
     //无根节点，拓扑结束
@@ -235,8 +242,8 @@ PROTOCOL_CALLBACK(52)
 void tpCallback(byte pId, byte *payload, unsigned int length, bool isTimeout)
 {
   waitingTransmit();
-  Serial.print("Received pID=" + String(pId) +  " Timeout=" + String(isTimeout ? "True " : "False "));
-  ADLOG_V(ESP.getMaxFreeBlockSize());
+  Serial.println("Received pID=" + String(pId) +  " Timeout=" + String(isTimeout ? "True " : "False "));
+//  ADLOG_V(ESP.getMaxFreeBlockSize());
   switch (pId)
   {
   case 51:
@@ -251,16 +258,20 @@ void setup()
   seekNodeQueue.setStorage(seekNodeQueue_storage);
   stLightType = STLT_WAITING_CHECK;
   Serial.begin(115200);
-  pinMode(D2, INPUT);
 
-  hdSerial.begin(9600);
+  hdSerial.begin(57600);
   hdSerial.setMode(SMT_TRANSMIT);
-  pinMode(D7, INPUT_PULLUP);
+  pinMode(HDSERIAL_PIN_BAKE, INPUT_PULLUP);
   TPT.callbackRegister(tpCallback, transmitCallback);
 
   delay(200);
   Serial.println("STARTING...");
-  TPT.tpBegin(1,255).tpByte(200).tpTransmit(); //所有节点初始化
+  /*
+   * 0b00000001 配置信息 
+   * 右1位 客户端调试模式
+   * 
+   */
+  TPT.tpBegin(1,255).tpByte(200).tpByte(0b00000001).tpTransmit(); //所有节点初始化
   delay(50);
   seekRootNode();
   Director.begin(true);
