@@ -1,7 +1,8 @@
 #include "HalfDuplexSerial.h"
 #include "TriangleProtocol.h"
 #include "ArduiDispatch.h"
-#include "ADHueAction.h"
+#include "ADRGBAction.h"
+#include "ADHSVAction.h"
 #include "ADBrightnessAction.h"
 #include <FastLED.h>
 #include "MemoryFree.h"
@@ -249,86 +250,106 @@ PROTOCOL_CALLBACK(101)
   }
 }
 
-void effect102Callback(uint8_t h, void *e)
+void effect102Callback(uint8_t h,uint8_t s,uint8_t v, void *e)
 {
   for (int i = 0; i < NUM_LEDS; i++)
   {
-    leds[ledNumsConverter(i)] = CHSV(h, 255, 255);
+    leds[ledNumsConverter(i)] = CHSV(h, s, v);
   }
   FastLED.show();
 }
 
-//在[0][1]毫秒内，所有灯颜色从0号灯当前颜色改为颜色[2],如时间为0，则直接修改
+//在[0][1]毫秒内，所有灯颜色从0号灯当前HSV颜色改为HSV颜色[2][3][4],如时间为0，则直接修改
 PROTOCOL_CALLBACK(102)
 {
   uint16_t t = uint16_t(payload[0] << 8) + uint16_t(payload[1]);
-  uint8_t h = payload[2];
   if (t > 0)
   {
-    ADHueAction *action = ADHueAction::create(effect102Callback, rgb2hsv_approximate(leds[0]).h, h, t);
+    CHSV hsv = rgb2hsv_approximate(leds[ledNumsConverter(0)]);
+    uint8_t c[3] = {hsv.h,hsv.s,hsv.v};
+    ADHSVAction *action = ADHSVAction::create(effect102Callback, c, payload + 2, t);
     ADActor *actor = ADActor::create(t, action, true);
     Director.addActor(actor);
-    //    effect102Callback(h, NULL);
   } else
   {
-    effect102Callback(h, NULL);
+    effect102Callback(payload[2],payload[3],payload[4], NULL);
   }
 }
 
 uint8_t m_hueInterval = 10;
 
-void effect103Callback(uint8_t h, void *e)
+void effect103Callback(uint8_t h,uint8_t s,uint8_t v,void *e)
 {
   for (int i = 0; i < NUM_LEDS; i++)
   {
-    leds[ledNumsConverter(i)] = CHSV((h + i * m_hueInterval) % 256, 255, 255);
-  }
+    leds[ledNumsConverter(i)] = CHSV((h + i * m_hueInterval) % 256, s, v);
+  } 
   FastLED.show();
 }
 
-//在[0][1]毫秒内，将灯颜色从颜色[2]变为颜色[3]，每一个灯珠色相值增加[4],如时间为0，则直接修改
+//在[0][1]毫秒内，将灯颜色从HSV颜色[2][3][4]变为颜色[5][6][7]，每一个灯珠色相值增加[8],如时间为0，则直接修改
 PROTOCOL_CALLBACK(103)
 {
   uint16_t t = uint16_t(payload[0] << 8) + uint16_t(payload[1]);
-  uint8_t h1 = payload[2];
-  uint8_t h2 = payload[3];
-  m_hueInterval = payload[4];
-
+  m_hueInterval = payload[8];
   if (t > 0)
   {
-    ADHueAction *action = ADHueAction::create(effect103Callback, h1, h2, t);
+    ADHSVAction *action = ADHSVAction::create(effect103Callback, payload+2, payload+5, t);
     ADActor *actor = ADActor::create(t, action, true);
     Director.addActor(actor);
   } else
   {
-    effect103Callback(h2, NULL);
+    effect103Callback(payload[5],payload[6],payload[7], NULL);
   }
 }
 
-void effect104Callback(uint8_t h, void *e)
+void effect104Callback(uint8_t h,uint8_t s,uint8_t v, void *e)
 {
   for (int i = 0; i < NUM_LEDS; i++)
   {
-    leds[ledNumsConverter(i)] = CHSV((h + (i / 5) * m_hueInterval) % 256, 255, 255);
+    leds[ledNumsConverter(i)] = CHSV((h + (i / 5) * m_hueInterval) % 256, s, v);
   }
   FastLED.show();
 }
 
-//在[0][1]毫秒内，将灯颜色从颜色[2]变为颜色[3]，每五个灯珠为一组色相值增加[4],如时间为0，则直接修改
+//在[0][1]毫秒内，将灯颜色从HSV颜色[2][3][4]变为颜色[5][6][7]，每五个灯珠为一组色相值增加[8],如时间为0，则直接修改
 PROTOCOL_CALLBACK(104)
 {
   uint16_t t = uint16_t(payload[0] << 8) + uint16_t(payload[1]);
-  uint8_t h1 = payload[2];
-  uint8_t h2 = payload[3];
-  m_hueInterval = payload[4];
+  m_hueInterval = payload[8];
   if (t > 0)
   {
-    ADHueAction *action = ADHueAction::create(effect104Callback, h1, h2, t);
+    ADHSVAction *action = ADHSVAction::create(effect104Callback, payload+2, payload+5, t);
     ADActor *actor = ADActor::create(t, action, true);
     Director.addActor(actor);
   } else
   {
-    effect104Callback(h2, NULL);
+    effect104Callback(payload[5],payload[6],payload[7], NULL);
+  }
+}
+
+void effect105Callback(uint8_t r,uint8_t g,uint8_t b, void *e)
+{
+  Serial.println("r:"+String(r)+" g:" + String(g) + " b:"+ String(b));
+  for (int i = 0; i < NUM_LEDS; i++)
+  {
+    leds[ledNumsConverter(i)] = CRGB(r,g,b);
+  }
+  FastLED.show();
+}
+
+//在[0][1]毫秒内，将灯颜色从RGB颜色[2][3][4]变为颜色[5][6][7],如时间为0，则直接修改
+PROTOCOL_CALLBACK(105)
+{
+  uint16_t t = uint16_t(payload[0] << 8) + uint16_t(payload[1]);
+  if (t > 0)
+  {
+    ADRGBAction *action = ADRGBAction::create(effect105Callback, payload+2, payload+5, t);
+    ADActor *actor = ADActor::create(t, action, true);
+    Director.addActor(actor);
+  } else
+  {
+    effect105Callback(payload[5],payload[6],payload[7], NULL);
   }
 }
 
@@ -387,6 +408,8 @@ void tpCallback(byte pId, byte *payload, unsigned int length, bool isTimeout)
       PORTOCOL_REGISTER(103);
     case 104:
       PORTOCOL_REGISTER(104);
+    case 105:
+      PORTOCOL_REGISTER(105);
     case 200:
       PORTOCOL_REGISTER(200);
   }
@@ -398,11 +421,13 @@ void transmitCallback(byte *ptBuffer, unsigned int ptLength)
   //  Serial.print("Sent pID=" + String(ptBuffer[3]));
   //  Serial.println(" Length=" + String(ptLength) + " ");
   //  ADLOG_V(freeMemory());
+  Serial.println("<<==Sent " + String(ptBuffer[3]) + " Length=" + String(ptLength) + " " +  String(freeMemory()));
   for (int i = 0; i < ptLength; i++)
   {
     byte c = ptBuffer[i];
     hdSerial.write(c);
   }
+  Serial.println("==>>");
 }
 
 void setup()

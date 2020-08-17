@@ -16,7 +16,7 @@ struct ProtocolCallbackDef
 
 #define TP_TRANSMIT_CALLBACK void (*trans_callback)(uint8_t *, unsigned int)
 
-#define DEFAULT_PROTOCO_TIMEOUT 200
+#define DEFAULT_PROTOCO_TIMEOUT 5
 
 #define MAX_PROTOCOL_BUFFER 256
 
@@ -77,7 +77,6 @@ public:
   void tpParse();
 
   String parseString(uint8_t *payload) const;
-
   
 };
 

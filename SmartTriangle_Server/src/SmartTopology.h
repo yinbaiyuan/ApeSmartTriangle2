@@ -6,10 +6,10 @@
 
 enum STNodeType
 {
-    STNT_WAITING_CHECK = 0,
-    STNT_CHECKING = 1,
-    STNT_HAS_NO_CHILD,
-    STNT_HAS_CHILD
+  STNT_WAITING_CHECK = 0,
+  STNT_CHECKING = 1,
+  STNT_HAS_NO_CHILD,
+  STNT_HAS_CHILD
 };
 
 struct STNodeDef
@@ -36,6 +36,9 @@ class SmartTopology
     uint8_t creatRootNode();
     uint8_t nodeCount();
     void flush();
+    void fullRandomInit(uint8_t n);
+
+    uint8_t fullRandom();
 };
 
 extern SmartTopology ST;

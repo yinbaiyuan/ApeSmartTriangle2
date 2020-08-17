@@ -112,5 +112,36 @@ void SmartTopology::deleteTree(STNodeDef *node)
     delete node;
   }
 }
+uint8_t *randomCache = NULL;
+uint8_t randomLength = 0;
 
+void SmartTopology::fullRandomInit(uint8_t n)
+{
+  if (randomCache)
+  {
+    delete randomCache;
+    randomCache = NULL;
+  }
+  if (n > 0)
+  {
+    randomCache = (uint8_t *)malloc(n);
+    randomLength = n;
+    for(int i = 0;i<n;i++)
+    {
+      randomCache[i] = i;
+    }
+  }
+}
+
+uint8_t SmartTopology::fullRandom()
+{
+  if(randomLength<=0)
+  {
+    return 0;
+  }
+  int pointer = random(0,randomLength);
+  uint8_t res = randomCache[pointer];
+  randomCache[pointer] = randomCache[--randomLength];
+  return res;
+}
 SmartTopology ST;

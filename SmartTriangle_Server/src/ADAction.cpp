@@ -24,6 +24,7 @@ void ADAction::callbackAction()
 
 void ADAction::callback()
 {
+  Serial.println(_times_c);
     _callback(_times_c, this);
 }
 

@@ -221,4 +221,6 @@ String TriangleProtocol::parseString(uint8_t *payload) const
   return res;
 }
 
+
+
 TriangleProtocol TPT;

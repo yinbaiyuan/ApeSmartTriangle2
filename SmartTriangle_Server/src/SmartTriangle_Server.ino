@@ -5,7 +5,13 @@
 #include "ArduiDispatch.h"
 #include "ADHueAction.h"
 
+#if defined ARDUINO
+#include "MemoryFree.h"
+#endif
+
 #define PROTOCOL_VER "0.1.0"
+
+#define DEBUG         1
 
 #define PROTOCOL_CALLBACK(x) void pId_callback_##x(byte *payload, unsigned int length, bool isTimeout)
 
@@ -19,13 +25,13 @@
   break
 
 #if defined ESP8266
-    #define HDSERIAL_PIN D6
-    #define HDSERIAL_PIN_BAKE D7
-    #define SLECTED_PIN D5
+#define HDSERIAL_PIN D6
+#define HDSERIAL_PIN_BAKE D7
+#define SLECTED_PIN D5
 #elif defined ARDUINO
-    #define HDSERIAL_PIN 6
-    #define HDSERIAL_PIN_BAKE 7
-    #define SLECTED_PIN 5
+#define HDSERIAL_PIN 6
+#define HDSERIAL_PIN_BAKE 7
+#define SLECTED_PIN 5
 #endif
 
 enum STLightType
@@ -74,43 +80,66 @@ void seekRootNode()
   //寻找根节点
   stLightType = STLT_CHECKING;
   startSelect();
-  TPT.tpBegin(51,255).tpTransmit(true);
+  TPT.tpBegin(51, 255).tpTransmit(true);
   waitingReceive();
 }
 
-void uniformColorEffect(unsigned int c, void *effect)
+void uniformColorEffect(uint32_t c, void *effect)
 {
-  TPT.tpBegin(102,255).tpUint16(1900).tpByte(random(0, 256)).tpTransmit();
+  TPT.tpBegin(102, 255).tpUint16(1900).tpByte(random(0, 256)).tpTransmit();
 }
 
-void singleRandomEffect(unsigned int n, unsigned int c, void *effect)
+void singleRandomEffect(uint32_t n, uint32_t c, void *effect)
 {
   // TPT.tpBegin(102,c).tpUint16(1000).tpByte(random(0, 256)).tpTransmit();
 }
 
-void singleLedEffect(unsigned int c, void *effect)
+void singleLedEffect(uint32_t c, void *effect)
 {
-  TPT.tpBegin(104,255).tpUint16(2800).tpByte(random(0, 256)).tpByte(random(0, 256)).tpByte(random(0, 256)).tpTransmit();
-  //  TPT.tpBegin(100,1).tpTransmit(true);
-  //   waitingReceive();
+  TPT.tpBegin(102, 255).tpUint16(2800).tpColor(random(0, 256), 255, 255).tpTransmit();
 }
 
-void randomEffect(unsigned int c, void *action)
+void allShowEffect(uint32_t n, void *effect)
 {
-  // TPT.tpBegin(104).tpByte(255).tpUint16(3000).tpUint16(5000).tpTransmit();
+  TPT.tpBegin(102, 255).tpUint16(3000).tpColor(random(0, 256), 255, 255).tpTransmit();
+}
+
+void singleShowEffect(uint32_t n, void *effect)
+{
+  if(n>25)return;
+  uint32_t count = ST.nodeCount();
+  if(n%count == 1)
+  {
+      ST.fullRandomInit(count);
+  }
+  uint8_t c = ST.fullRandom();
+  ADLOG_V(count);
+  ADLOG_V(n);
+  ADLOG_V(c);
+  TPT.tpBegin(102, c).tpUint16(random(1500,2800)).tpColor(random(0, 256), 255, 255).tpTransmit();
+}
+
+void flowerShowEffect(unsigned int n, void *effect)
+{
+  uint32_t count = ST.nodeCount();
+  TPT.tpBegin(104, 255).tpUint16(3000).tpColor(random(0, 256), 255, 255).tpColor(random(0, 256), 255, 255).tpByte(50).tpTransmit();
 }
 
 void effectSetup()
 {
-  // uint32_t count = ST.nodeCount();
+  uint32_t count = ST.nodeCount();
 
-  ADAction *randomAction = ADAction::create(uniformColorEffect, 2000, 3, 0, false);
-  ADActor *randomActor = ADActor::create(6000, randomAction);
-  Director.addActor(randomActor);
+  ADAction *allShowAction = ADAction::create(allShowEffect, 3000, 3, 0, false);
+  ADActor *allShowActor = ADActor::create(9000, allShowAction);
+  Director.addActor(allShowActor);
 
-  ADAction *singleLeAction = ADAction::create(singleLedEffect, 3000, 2, 0, false);
-  ADActor *singleLeActor = ADActor::create(6000, singleLeAction);
-  Director.addActor(singleLeActor);
+  ADAction *singleShowAction = ADAction::create(singleShowEffect, 1000, 30, 0, false);
+  ADActor *singleShowActor = ADActor::create(30000, singleShowAction);
+  Director.addActor(singleShowActor);
+
+  ADAction *flowerShowAction = ADAction::create(flowerShowEffect, 3000, 3, 0, false);
+  ADActor *flowerShowActor = ADActor::create(9000, flowerShowAction);
+  Director.addActor(flowerShowActor);
 
   // effectCreate(5000*count,count,5000,randomEffect);
   // effectCreate(10000,2,5000,uniformColorEffect);
@@ -124,7 +153,8 @@ void seekNodeByQueue()
     stLightType = STLT_SHOW_EFFECT;
     effectSetup();
     ADLOG_SV("Topo SUCCESSED!!!", millis());
-    delay(1000);
+    TPT.tpBegin(200, 255).tpTransmit();
+    delay(500);
     Director.startAction(millis());
     return;
   }
@@ -132,18 +162,18 @@ void seekNodeByQueue()
   if (node->leftChildType == STNT_WAITING_CHECK)
   {
     node->leftChildType = STNT_CHECKING;
-    TPT.tpBegin(21,node->nodeId).tpTransmit();
+    TPT.tpBegin(21, node->nodeId).tpTransmit();
     delay(100);
-    TPT.tpBegin(52,255).tpTransmit(true);
+    TPT.tpBegin(52, 255).tpTransmit(true);
     waitingReceive();
     currentNode = node;
   }
   else if (node->rightChildType == STNT_WAITING_CHECK)
   {
     node->rightChildType = STNT_CHECKING;
-    TPT.tpBegin(23,node->nodeId).tpTransmit();
+    TPT.tpBegin(23, node->nodeId).tpTransmit();
     delay(100);
-    TPT.tpBegin(52,255).tpTransmit(true);
+    TPT.tpBegin(52, 255).tpTransmit(true);
     waitingReceive();
     currentNode = node;
   }
@@ -153,17 +183,6 @@ void seekLeafNode()
 {
   seekNodeQueue.push_back(ST.rootNode());
   seekNodeByQueue();
-}
-
-void transmitCallback(byte *ptBuffer, unsigned int ptLength)
-{
-  Serial.println("Sent pID=" + String(ptBuffer[3]) +  " Length=" + String(ptLength) + " ");
-//  ADLOG_V(ESP.getMaxFreeBlockSize());
-  for (unsigned int i = 0; i < ptLength; i++)
-  {
-    uint8_t c = ptBuffer[i];
-    hdSerial.write(c);
-  }
 }
 
 PROTOCOL_CALLBACK(51)
@@ -180,9 +199,11 @@ PROTOCOL_CALLBACK(51)
     //有节点
     uint8_t nodeId = ST.creatRootNode();
     Serial.println("ROOT NODE ID:" + String(nodeId));
-    TPT.tpBegin(2,255).tpByte(nodeId).tpTransmit();
-    TPT.tpBegin(200,nodeId).tpTransmit();
-    // delay(500);
+    TPT.tpBegin(2, 255).tpByte(nodeId).tpTransmit();
+    TPT.tpBegin(200, nodeId).tpTransmit();
+#if DEBUG == 1
+    delay(600);
+#endif
     seekLeafNode();
   }
 }
@@ -194,12 +215,12 @@ PROTOCOL_CALLBACK(52)
     //无子节点
     if (currentNode->leftChildType == STNT_CHECKING)
     {
-      TPT.tpBegin(22,currentNode->nodeId).tpTransmit();
+      TPT.tpBegin(22, currentNode->nodeId).tpTransmit();
       currentNode->leftChildType = STNT_HAS_NO_CHILD;
     }
     else if (currentNode->rightChildType == STNT_CHECKING)
     {
-      TPT.tpBegin(24,currentNode->nodeId).tpTransmit();
+      TPT.tpBegin(24, currentNode->nodeId).tpTransmit();
       currentNode->rightChildType = STNT_HAS_NO_CHILD;
       seekNodeQueue.remove(0);
     }
@@ -215,19 +236,23 @@ PROTOCOL_CALLBACK(52)
     {
       currentNode->leftChildType = STNT_HAS_CHILD;
       currentNode->leftChild = node;
-      TPT.tpBegin(22,currentNode->nodeId).tpTransmit();
-      TPT.tpBegin(2,255).tpByte(node->nodeId).tpTransmit();
-      TPT.tpBegin(200,node->nodeId).tpTransmit();
-      // delay(500);
+      TPT.tpBegin(22, currentNode->nodeId).tpTransmit();
+      TPT.tpBegin(2, 255).tpByte(node->nodeId).tpTransmit();
+      TPT.tpBegin(200, node->nodeId).tpTransmit();
+#if DEBUG == 1
+      delay(600);
+#endif
     }
     else if (currentNode->rightChildType == STNT_CHECKING)
     {
       currentNode->rightChildType = STNT_HAS_CHILD;
       currentNode->rightChild = node;
-      TPT.tpBegin(24,currentNode->nodeId).tpTransmit();
-      TPT.tpBegin(2,255).tpByte(node->nodeId).tpTransmit();
-      TPT.tpBegin(200,node->nodeId).tpTransmit();
-      // delay(500);
+      TPT.tpBegin(24, currentNode->nodeId).tpTransmit();
+      TPT.tpBegin(2, 255).tpByte(node->nodeId).tpTransmit();
+      TPT.tpBegin(200, node->nodeId).tpTransmit();
+#if DEBUG == 1
+      delay(600);
+#endif
       seekNodeQueue.remove(0);
     }
     else
@@ -242,19 +267,41 @@ PROTOCOL_CALLBACK(52)
 void tpCallback(byte pId, byte *payload, unsigned int length, bool isTimeout)
 {
   waitingTransmit();
-  Serial.println("Received pID=" + String(pId) +  " Timeout=" + String(isTimeout ? "True " : "False "));
-//  ADLOG_V(ESP.getMaxFreeBlockSize());
+#if defined ESP8266
+  Serial.println("<<==Rec. " + String(pId) + (isTimeout ? " T " : " F ") + String(ESP.getMaxFreeBlockSize()));
+#elif defined ARDUINO
+  Serial.println("<<==Rec. " + String(pId) + (isTimeout ? " T " : " F ") + String(freeMemory()));
+#endif
   switch (pId)
   {
-  case 51:
-    PORTOCOL_REGISTER(51);
-  case 52:
-    PORTOCOL_REGISTER(52);
+    case 51:
+      PORTOCOL_REGISTER(51);
+    case 52:
+      PORTOCOL_REGISTER(52);
   }
+  Serial.println("==>>");
+}
+
+
+void transmitCallback(byte *ptBuffer, unsigned int ptLength)
+{
+
+#if defined ESP8266
+  Serial.println("<<==Sent " + String(ptBuffer[3]) + " Length=" + String(ptLength) + " " +  String(ESP.getMaxFreeBlockSize()));
+#elif defined ARDUINO
+  Serial.println("<<==Sent " + String(ptBuffer[3]) + " Length=" + String(ptLength) + " " +  String(freeMemory()));
+#endif
+  for (unsigned int i = 0; i < ptLength; i++)
+  {
+    uint8_t c = ptBuffer[i];
+    hdSerial.write(c);
+  }
+  Serial.println("==>>");
 }
 
 void setup()
 {
+
   seekNodeQueue.setStorage(seekNodeQueue_storage);
   stLightType = STLT_WAITING_CHECK;
   Serial.begin(115200);
@@ -264,14 +311,16 @@ void setup()
   pinMode(HDSERIAL_PIN_BAKE, INPUT_PULLUP);
   TPT.callbackRegister(tpCallback, transmitCallback);
 
-  delay(200);
+  pinMode(A0, INPUT);
+  randomSeed(analogRead(A0));
+  delay(2000);//等待2秒，让所有客户端启动
   Serial.println("STARTING...");
   /*
-   * 0b00000001 配置信息 
-   * 右1位 客户端调试模式
-   * 
-   */
-  TPT.tpBegin(1,255).tpByte(200).tpByte(0b00000001).tpTransmit(); //所有节点初始化
+     0b00000001 配置信息
+     右1位 客户端调试模式
+
+  */
+  TPT.tpBegin(1, 255).tpByte(200).tpByte(0b00000001).tpTransmit(); //所有节点初始化
   delay(50);
   seekRootNode();
   Director.begin(true);
